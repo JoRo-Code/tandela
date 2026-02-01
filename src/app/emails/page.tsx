@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { desc } from "drizzle-orm";
 import { emails } from "@/lib/db/schema";
 import { EmailItem } from "./email-item";
+import { SyncButton } from "./sync-button";
 
 export default async function EmailsPage({
   searchParams,
@@ -33,6 +34,7 @@ export default async function EmailsPage({
             <span className="text-sm text-zinc-600 dark:text-zinc-400">
               {allEmails.length} emails
             </span>
+            <SyncButton />
           </div>
         </div>
       </header>
