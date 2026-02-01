@@ -1,10 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db, emails, drafts, activityLogs, workspaces } from "@/lib/db";
+import { db, emails, drafts, activityLogs } from "@/lib/db";
 import { processEmail, BusinessContext, PipelineConfig } from "@/lib/ai/pipeline";
 import { eq, isNull } from "drizzle-orm";
+import { getWorkspaceApi } from "@/lib/auth-helpers";
 
 export async function POST(request: NextRequest) {
   try {
+    // Get the authenticated user's workspace
+    const result = await getWorkspaceApi();
+    if ("error" in result) {
+      return result.error;
+    }
+
+    const { workspace } = result;
+
     const body = await request.json();
     const { emailId, mode } = body;
 
@@ -17,12 +26,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Email not found" }, { status: 404 });
     }
 
-    // Get workspace and business context
-    const workspace = await db.query.workspaces.findFirst();
-    if (!workspace) {
-      return NextResponse.json({ error: "No workspace found" }, { status: 400 });
-    }
-
+    // Build business context from workspace
     const context: BusinessContext = {
       name: workspace.name,
       type: workspace.businessType || "business",
@@ -40,7 +44,7 @@ export async function POST(request: NextRequest) {
 
     // If specific email, process just that one
     if (email) {
-      const result = await processEmail(
+      const pipelineResult = await processEmail(
         {
           id: email.id,
           subject: email.subject,
@@ -56,19 +60,19 @@ export async function POST(request: NextRequest) {
 
       // Save draft to database if we have a proposed response
       let draft = null;
-      if (result.proposedResponse) {
+      if (pipelineResult.proposedResponse) {
         [draft] = await db
           .insert(drafts)
           .values({
             emailId: email.id,
             workspaceId: workspace.id,
-            intent: result.assessment.intent,
-            intentConfidence: result.assessment.confidence,
-            responseSubject: result.proposedResponse.emailSubject,
-            responseBody: result.proposedResponse.emailBody,
-            responseConfidence: result.proposedResponse.confidence,
-            action: result.execution.decision,
-            processingTimeMs: result.processingTimeMs,
+            intent: pipelineResult.assessment.intent,
+            intentConfidence: pipelineResult.assessment.confidence,
+            responseSubject: pipelineResult.proposedResponse.emailSubject,
+            responseBody: pipelineResult.proposedResponse.emailBody,
+            responseConfidence: pipelineResult.proposedResponse.confidence,
+            action: pipelineResult.execution.decision,
+            processingTimeMs: pipelineResult.processingTimeMs,
           })
           .returning();
       }
@@ -80,16 +84,16 @@ export async function POST(request: NextRequest) {
         draftId: draft?.id,
         type: "pipeline_complete",
         data: {
-          assessment: result.assessment,
-          requiredActions: result.requiredActions.map(a => a.type),
-          capabilityCheck: result.capabilityCheck,
-          execution: result.execution,
-          model: result.model,
-          processingTimeMs: result.processingTimeMs,
+          assessment: pipelineResult.assessment,
+          requiredActions: pipelineResult.requiredActions.map(a => a.type),
+          capabilityCheck: pipelineResult.capabilityCheck,
+          execution: pipelineResult.execution,
+          model: pipelineResult.model,
+          processingTimeMs: pipelineResult.processingTimeMs,
         },
       });
 
-      return NextResponse.json({ result, draft });
+      return NextResponse.json({ result: pipelineResult, draft });
     }
 
     // Process all unprocessed emails

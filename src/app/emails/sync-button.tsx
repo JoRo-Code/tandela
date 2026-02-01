@@ -3,9 +3,19 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
+interface SyncResult {
+  success: boolean;
+  totalNewEmails: number;
+  connections: Array<{
+    email: string;
+    newEmails: number;
+    error?: string;
+  }>;
+}
+
 export function SyncButton() {
   const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState<{ newEmails: number } | null>(null);
+  const [result, setResult] = useState<SyncResult | null>(null);
   const router = useRouter();
 
   async function handleSync() {
@@ -61,17 +71,14 @@ export function SyncButton() {
                 d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
               />
             </svg>
-            Sync
+            Sync All
           </>
         )}
       </button>
-      {result && result.newEmails > 0 && (
-        <span className="text-sm text-green-600 dark:text-green-400">
-          +{result.newEmails} new
+      {result && (
+        <span className={`text-sm ${result.totalNewEmails > 0 ? "text-green-600 dark:text-green-400" : "text-zinc-500"}`}>
+          {result.totalNewEmails > 0 ? `+${result.totalNewEmails} new` : "Up to date"}
         </span>
-      )}
-      {result && result.newEmails === 0 && (
-        <span className="text-sm text-zinc-500">Up to date</span>
       )}
     </div>
   );

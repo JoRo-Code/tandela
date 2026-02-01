@@ -1,9 +1,9 @@
 import Link from "next/link";
-import { db } from "@/lib/db";
-import { desc } from "drizzle-orm";
-import { emails } from "@/lib/db/schema";
+import { db, emails, emailConnections } from "@/lib/db";
+import { desc, eq } from "drizzle-orm";
 import { EmailItem } from "./email-item";
 import { SyncButton } from "./sync-button";
+import { getWorkspace } from "@/lib/auth-helpers";
 
 export default async function EmailsPage({
   searchParams,
@@ -14,10 +14,25 @@ export default async function EmailsPage({
   const justConnected = params.connected === "true";
   const syncedCount = params.count ? parseInt(params.count) : 0;
 
-  const allEmails = await db.query.emails.findMany({
-    orderBy: [desc(emails.receivedAt)],
-    limit: 100,
-  });
+  // Get the authenticated user's workspace
+  const workspace = await getWorkspace();
+
+  // Fetch emails for this workspace only (via email connections)
+  const allEmails = await db
+    .select({
+      id: emails.id,
+      subject: emails.subject,
+      fromAddress: emails.fromAddress,
+      bodyText: emails.bodyText,
+      isRead: emails.isRead,
+      receivedAt: emails.receivedAt,
+      accountEmail: emailConnections.emailAddress,
+    })
+    .from(emails)
+    .innerJoin(emailConnections, eq(emails.connectionId, emailConnections.id))
+    .where(eq(emailConnections.workspaceId, workspace.id))
+    .orderBy(desc(emails.receivedAt))
+    .limit(100);
 
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950">
@@ -76,6 +91,7 @@ export default async function EmailsPage({
                     bodyText: email.bodyText,
                     isRead: email.isRead ?? false,
                     receivedAt: email.receivedAt,
+                    accountEmail: email.accountEmail,
                   }}
                 />
               ))}

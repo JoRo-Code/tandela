@@ -10,6 +10,7 @@ interface Email {
   bodyText: string | null;
   isRead: boolean;
   receivedAt: Date | null;
+  accountEmail?: string | null;
 }
 
 function formatDate(date: Date | null) {
@@ -83,9 +84,16 @@ export function EmailItem({ email }: { email: Email }) {
             >
               {extractName(email.fromAddress)}
             </span>
-            <span className="flex-shrink-0 text-xs text-zinc-500 dark:text-zinc-400">
-              {formatDate(email.receivedAt)}
-            </span>
+            <div className="flex items-center gap-2 flex-shrink-0">
+              {email.accountEmail && (
+                <span className="text-xs text-zinc-400 dark:text-zinc-500">
+                  to {email.accountEmail.split("@")[0]}
+                </span>
+              )}
+              <span className="text-xs text-zinc-500 dark:text-zinc-400">
+                {formatDate(email.receivedAt)}
+              </span>
+            </div>
           </div>
           <div
             className={`mt-1 truncate ${

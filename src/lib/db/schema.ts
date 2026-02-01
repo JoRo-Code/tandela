@@ -1,4 +1,59 @@
-import { pgTable, uuid, text, timestamp, boolean, real, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, uuid, text, timestamp, boolean, real, jsonb, integer, primaryKey } from "drizzle-orm/pg-core";
+import { relations } from "drizzle-orm";
+
+// ============================================
+// NextAuth.js Tables
+// ============================================
+
+// Users (NextAuth)
+export const users = pgTable("users", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  name: text("name"),
+  email: text("email").notNull().unique(),
+  emailVerified: timestamp("email_verified"),
+  image: text("image"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// NextAuth accounts (OAuth providers)
+export const accounts = pgTable("accounts", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id")
+    .references(() => users.id, { onDelete: "cascade" })
+    .notNull(),
+  type: text("type").notNull(),
+  provider: text("provider").notNull(),
+  providerAccountId: text("provider_account_id").notNull(),
+  refresh_token: text("refresh_token"),
+  access_token: text("access_token"),
+  expires_at: integer("expires_at"),
+  token_type: text("token_type"),
+  scope: text("scope"),
+  id_token: text("id_token"),
+});
+
+// NextAuth sessions
+export const sessions = pgTable("sessions", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  sessionToken: text("session_token").notNull().unique(),
+  userId: uuid("user_id")
+    .references(() => users.id, { onDelete: "cascade" })
+    .notNull(),
+  expires: timestamp("expires").notNull(),
+});
+
+// NextAuth verification tokens (for email verification)
+export const verificationTokens = pgTable("verification_tokens", {
+  identifier: text("identifier").notNull(),
+  token: text("token").notNull().unique(),
+  expires: timestamp("expires").notNull(),
+}, (vt) => ({
+  compoundKey: primaryKey({ columns: [vt.identifier, vt.token] }),
+}));
+
+// ============================================
+// Application Tables
+// ============================================
 
 // Workspaces (tenants)
 export const workspaces = pgTable("workspaces", {
@@ -10,6 +65,19 @@ export const workspaces = pgTable("workspaces", {
   businessHours: text("business_hours"),
   businessTone: text("business_tone"), // 'formal' | 'friendly' | 'casual'
   customInstructions: text("custom_instructions"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// User-workspace membership (for team support)
+export const workspaceMembers = pgTable("workspace_members", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  workspaceId: uuid("workspace_id")
+    .references(() => workspaces.id, { onDelete: "cascade" })
+    .notNull(),
+  userId: uuid("user_id")
+    .references(() => users.id, { onDelete: "cascade" })
+    .notNull(),
+  role: text("role").notNull().default("owner"), // 'owner' | 'admin' | 'member'
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -86,9 +154,46 @@ export const activityLogs = pgTable("activity_logs", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+// ============================================
+// Relations
+// ============================================
+
+export const usersRelations = relations(users, ({ many }) => ({
+  accounts: many(accounts),
+  sessions: many(sessions),
+  workspaceMembers: many(workspaceMembers),
+}));
+
+export const workspacesRelations = relations(workspaces, ({ many }) => ({
+  members: many(workspaceMembers),
+  emailConnections: many(emailConnections),
+}));
+
+export const workspaceMembersRelations = relations(workspaceMembers, ({ one }) => ({
+  workspace: one(workspaces, {
+    fields: [workspaceMembers.workspaceId],
+    references: [workspaces.id],
+  }),
+  user: one(users, {
+    fields: [workspaceMembers.userId],
+    references: [users.id],
+  }),
+}));
+
+// ============================================
 // Types
+// ============================================
+
+export type User = typeof users.$inferSelect;
+export type NewUser = typeof users.$inferInsert;
+export type Account = typeof accounts.$inferSelect;
+export type NewAccount = typeof accounts.$inferInsert;
+export type Session = typeof sessions.$inferSelect;
+export type NewSession = typeof sessions.$inferInsert;
 export type Workspace = typeof workspaces.$inferSelect;
 export type NewWorkspace = typeof workspaces.$inferInsert;
+export type WorkspaceMember = typeof workspaceMembers.$inferSelect;
+export type NewWorkspaceMember = typeof workspaceMembers.$inferInsert;
 export type EmailConnection = typeof emailConnections.$inferSelect;
 export type NewEmailConnection = typeof emailConnections.$inferInsert;
 export type Email = typeof emails.$inferSelect;
