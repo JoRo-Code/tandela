@@ -157,3 +157,59 @@ export async function fetchEmails(
 
   return emails;
 }
+
+export interface SendEmailOptions {
+  to: string;
+  subject: string;
+  body: string;
+  threadId?: string;
+  inReplyTo?: string;
+  references?: string;
+}
+
+export async function sendEmail(
+  accessToken: string,
+  refreshToken: string | undefined,
+  options: SendEmailOptions
+): Promise<{ id: string; threadId: string }> {
+  const gmail = getGmailClient(accessToken, refreshToken);
+
+  // Build email headers
+  const headers = [
+    `To: ${options.to}`,
+    `Subject: ${options.subject}`,
+    "Content-Type: text/plain; charset=utf-8",
+  ];
+
+  // Add threading headers if replying
+  if (options.inReplyTo) {
+    headers.push(`In-Reply-To: ${options.inReplyTo}`);
+  }
+  if (options.references) {
+    headers.push(`References: ${options.references}`);
+  }
+
+  // Combine headers and body
+  const email = [...headers, "", options.body].join("\r\n");
+
+  // Encode as base64url
+  const encodedEmail = Buffer.from(email)
+    .toString("base64")
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/, "");
+
+  // Send the email
+  const response = await gmail.users.messages.send({
+    userId: "me",
+    requestBody: {
+      raw: encodedEmail,
+      threadId: options.threadId,
+    },
+  });
+
+  return {
+    id: response.data.id!,
+    threadId: response.data.threadId!,
+  };
+}

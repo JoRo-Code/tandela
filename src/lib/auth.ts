@@ -1,14 +1,19 @@
 import NextAuth from "next-auth";
 import Google from "next-auth/providers/google";
 import { DrizzleAdapter } from "@auth/drizzle-adapter";
-import { getDb, workspaces, workspaceMembers } from "./db";
+import { getDb, workspaces, workspaceMembers, users, accounts, sessions, verificationTokens } from "./db";
 import { eq } from "drizzle-orm";
 
 // Get the actual db instance for the adapter
 const db = getDb();
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
-  adapter: DrizzleAdapter(db),
+  adapter: DrizzleAdapter(db, {
+    usersTable: users,
+    accountsTable: accounts,
+    sessionsTable: sessions,
+    verificationTokensTable: verificationTokens,
+  }),
   providers: [
     Google({
       clientId: process.env.GOOGLE_CLIENT_ID!,

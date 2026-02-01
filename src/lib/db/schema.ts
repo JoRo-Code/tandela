@@ -16,6 +16,7 @@ export const users = pgTable("users", {
 });
 
 // NextAuth accounts (OAuth providers)
+// Note: Property names must match what @auth/drizzle-adapter expects (snake_case)
 export const accounts = pgTable("accounts", {
   id: uuid("id").primaryKey().defaultRandom(),
   userId: uuid("user_id")
@@ -30,12 +31,13 @@ export const accounts = pgTable("accounts", {
   token_type: text("token_type"),
   scope: text("scope"),
   id_token: text("id_token"),
+  session_state: text("session_state"),
 });
 
 // NextAuth sessions
+// Note: sessionToken must be primary key for @auth/drizzle-adapter
 export const sessions = pgTable("sessions", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  sessionToken: text("session_token").notNull().unique(),
+  sessionToken: text("session_token").primaryKey(),
   userId: uuid("user_id")
     .references(() => users.id, { onDelete: "cascade" })
     .notNull(),
@@ -178,6 +180,41 @@ export const workspaceMembersRelations = relations(workspaceMembers, ({ one }) =
     fields: [workspaceMembers.userId],
     references: [users.id],
   }),
+}));
+
+export const draftsRelations = relations(drafts, ({ one }) => ({
+  email: one(emails, {
+    fields: [drafts.emailId],
+    references: [emails.id],
+  }),
+  workspace: one(workspaces, {
+    fields: [drafts.workspaceId],
+    references: [workspaces.id],
+  }),
+}));
+
+export const activityLogsRelations = relations(activityLogs, ({ one }) => ({
+  email: one(emails, {
+    fields: [activityLogs.emailId],
+    references: [emails.id],
+  }),
+  draft: one(drafts, {
+    fields: [activityLogs.draftId],
+    references: [drafts.id],
+  }),
+  workspace: one(workspaces, {
+    fields: [activityLogs.workspaceId],
+    references: [workspaces.id],
+  }),
+}));
+
+export const emailsRelations = relations(emails, ({ one, many }) => ({
+  connection: one(emailConnections, {
+    fields: [emails.connectionId],
+    references: [emailConnections.id],
+  }),
+  drafts: many(drafts),
+  activityLogs: many(activityLogs),
 }));
 
 // ============================================
