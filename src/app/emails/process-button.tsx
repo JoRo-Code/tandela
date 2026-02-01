@@ -5,24 +5,49 @@ import { useState } from "react";
 interface ProcessResult {
   result: {
     emailId: string;
-    classification: {
+    assessment: {
+      senderType: string;
       intent: string;
+      urgency: string;
+      sentiment: string;
+      threadContext: string | null;
+      confidence: number;
+    };
+    requiredActions: Array<{
+      type: string;
+      priority: number;
+      parameters: Record<string, unknown>;
+      reasoning: string;
+    }>;
+    capabilityCheck: {
+      canProceed: boolean;
+      missingInfo: string[];
+      blockedActions: string[];
+      confidence: number;
+    };
+    proposedResponse: {
+      emailSubject: string;
+      emailBody: string;
+      actions: Array<{
+        type: string;
+        description: string;
+        willExecute: boolean;
+      }>;
       confidence: number;
       reasoning: string;
-      extractedInfo?: Record<string, string>;
+    } | null;
+    execution: {
+      decision: "auto_execute" | "queue_draft" | "escalate";
+      actionsExecuted: string[];
+      actionsPending: string[];
+      escalationReason?: string;
     };
-    response?: {
-      subject: string;
-      body: string;
-      confidence: number;
-      reasoning: string;
-    };
-    action: "draft" | "escalate" | "ignore";
     processingTimeMs: number;
+    model: string;
   };
   draft: {
     id: string;
-  };
+  } | null;
 }
 
 export function ProcessButton({ emailId }: { emailId: string }) {
@@ -56,6 +81,19 @@ export function ProcessButton({ emailId }: { emailId: string }) {
     }
   }
 
+  const decisionColors = {
+    auto_execute: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200",
+    queue_draft: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200",
+    escalate: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200",
+  };
+
+  const sentimentColors = {
+    urgent: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200",
+    frustrated: "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200",
+    neutral: "bg-zinc-100 text-zinc-800 dark:bg-zinc-700 dark:text-zinc-200",
+    positive: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200",
+  };
+
   return (
     <div className="mt-3">
       <button
@@ -83,79 +121,108 @@ export function ProcessButton({ emailId }: { emailId: string }) {
       )}
 
       {result && (
-        <div className="mt-3 space-y-3 rounded-md border border-zinc-200 bg-zinc-50 p-4 text-sm dark:border-zinc-700 dark:bg-zinc-800">
-          {/* Classification */}
+        <div className="mt-3 space-y-4 rounded-md border border-zinc-200 bg-zinc-50 p-4 text-sm dark:border-zinc-700 dark:bg-zinc-800">
+          {/* Assessment */}
           <div>
             <div className="font-medium text-zinc-900 dark:text-zinc-100">
-              Classification
+              Step 1: Assessment
             </div>
             <div className="mt-1 flex flex-wrap gap-2">
               <span className="inline-flex items-center rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-medium text-blue-800 dark:bg-blue-900 dark:text-blue-200">
-                {result.result.classification.intent}
+                {result.result.assessment.intent}
+              </span>
+              <span className="inline-flex items-center rounded-full bg-purple-100 px-2.5 py-0.5 text-xs font-medium text-purple-800 dark:bg-purple-900 dark:text-purple-200">
+                {result.result.assessment.senderType}
+              </span>
+              <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${sentimentColors[result.result.assessment.sentiment as keyof typeof sentimentColors] || sentimentColors.neutral}`}>
+                {result.result.assessment.sentiment}
               </span>
               <span className="inline-flex items-center rounded-full bg-zinc-100 px-2.5 py-0.5 text-xs font-medium text-zinc-800 dark:bg-zinc-700 dark:text-zinc-200">
-                {Math.round(result.result.classification.confidence * 100)}% confident
-              </span>
-              <span
-                className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                  result.result.action === "draft"
-                    ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
-                    : result.result.action === "escalate"
-                    ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200"
-                    : "bg-zinc-100 text-zinc-800 dark:bg-zinc-700 dark:text-zinc-200"
-                }`}
-              >
-                → {result.result.action}
+                {Math.round(result.result.assessment.confidence * 100)}% confident
               </span>
             </div>
-            <p className="mt-1 text-zinc-600 dark:text-zinc-400">
-              {result.result.classification.reasoning}
-            </p>
           </div>
 
-          {/* Extracted Info */}
-          {result.result.classification.extractedInfo &&
-            Object.keys(result.result.classification.extractedInfo).length > 0 && (
-              <div>
-                <div className="font-medium text-zinc-900 dark:text-zinc-100">
-                  Extracted Info
+          {/* Required Actions */}
+          <div>
+            <div className="font-medium text-zinc-900 dark:text-zinc-100">
+              Step 2: Required Actions
+            </div>
+            <div className="mt-1 space-y-1">
+              {result.result.requiredActions.map((action, i) => (
+                <div key={i} className="flex items-start gap-2">
+                  <span className="inline-flex items-center rounded-full bg-indigo-100 px-2.5 py-0.5 text-xs font-medium text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200">
+                    {action.type}
+                  </span>
+                  <span className="text-zinc-600 dark:text-zinc-400 text-xs">
+                    {action.reasoning}
+                  </span>
                 </div>
-                <div className="mt-1 text-zinc-600 dark:text-zinc-400">
-                  {Object.entries(result.result.classification.extractedInfo).map(
-                    ([key, value]) =>
-                      value && (
-                        <div key={key}>
-                          <span className="font-medium">{key}:</span> {value}
-                        </div>
-                      )
-                  )}
-                </div>
-              </div>
-            )}
+              ))}
+            </div>
+          </div>
 
-          {/* Generated Response */}
-          {result.result.response && (
+          {/* Capability Check */}
+          <div>
+            <div className="font-medium text-zinc-900 dark:text-zinc-100">
+              Step 3: Capability Check
+            </div>
+            <div className="mt-1 flex flex-wrap gap-2">
+              <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${result.result.capabilityCheck.canProceed ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200" : "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200"}`}>
+                {result.result.capabilityCheck.canProceed ? "Can proceed" : "Cannot proceed"}
+              </span>
+              {result.result.capabilityCheck.missingInfo.length > 0 && (
+                <span className="text-xs text-zinc-600 dark:text-zinc-400">
+                  Missing: {result.result.capabilityCheck.missingInfo.join(", ")}
+                </span>
+              )}
+            </div>
+          </div>
+
+          {/* Proposed Response */}
+          {result.result.proposedResponse && (
             <div>
               <div className="font-medium text-zinc-900 dark:text-zinc-100">
-                Draft Response
+                Step 4: Draft Response
                 <span className="ml-2 text-xs font-normal text-zinc-500">
-                  ({Math.round(result.result.response.confidence * 100)}% confident)
+                  ({Math.round(result.result.proposedResponse.confidence * 100)}% confident)
                 </span>
               </div>
               <div className="mt-2 rounded border border-zinc-200 bg-white p-3 dark:border-zinc-600 dark:bg-zinc-900">
                 <div className="font-medium text-zinc-900 dark:text-zinc-100">
-                  {result.result.response.subject}
+                  {result.result.proposedResponse.emailSubject}
                 </div>
                 <div className="mt-2 whitespace-pre-wrap text-zinc-700 dark:text-zinc-300">
-                  {result.result.response.body}
+                  {result.result.proposedResponse.emailBody}
                 </div>
               </div>
+              <p className="mt-1 text-xs text-zinc-500">
+                {result.result.proposedResponse.reasoning}
+              </p>
             </div>
           )}
 
+          {/* Execution Decision */}
+          <div>
+            <div className="font-medium text-zinc-900 dark:text-zinc-100">
+              Step 5: Decision
+            </div>
+            <div className="mt-1 flex flex-wrap items-center gap-2">
+              <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${decisionColors[result.result.execution.decision]}`}>
+                {result.result.execution.decision.replace("_", " ")}
+              </span>
+              {result.result.execution.escalationReason && (
+                <span className="text-xs text-zinc-600 dark:text-zinc-400">
+                  Reason: {result.result.execution.escalationReason}
+                </span>
+              )}
+            </div>
+          </div>
+
           {/* Metadata */}
-          <div className="text-xs text-zinc-500">
-            Processed in {result.result.processingTimeMs}ms
+          <div className="flex items-center gap-3 text-xs text-zinc-500 border-t border-zinc-200 dark:border-zinc-700 pt-3">
+            <span>Processed in {result.result.processingTimeMs}ms</span>
+            <span>Model: {result.result.model}</span>
           </div>
         </div>
       )}
