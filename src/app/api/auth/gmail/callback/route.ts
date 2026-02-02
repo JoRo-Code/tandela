@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getTokensFromCode, getUserEmail, fetchEmails } from "@/lib/gmail";
 import { db, emailConnections, emails } from "@/lib/db";
 
+const BASE_URL = process.env.NEXTAUTH_URL || process.env.AUTH_URL || "http://localhost:3000";
+
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
   const code = searchParams.get("code");
@@ -10,12 +12,12 @@ export async function GET(request: NextRequest) {
 
   if (error) {
     return NextResponse.redirect(
-      new URL(`/?error=${encodeURIComponent(error)}`, request.url)
+      new URL(`/?error=${encodeURIComponent(error)}`, BASE_URL)
     );
   }
 
   if (!code || !state) {
-    return NextResponse.redirect(new URL("/?error=missing_params", request.url));
+    return NextResponse.redirect(new URL("/?error=missing_params", BASE_URL));
   }
 
   try {
@@ -77,12 +79,12 @@ export async function GET(request: NextRequest) {
     }
 
     return NextResponse.redirect(
-      new URL(`/emails?connected=true&count=${fetchedEmails.length}`, request.url)
+      new URL(`/emails?connected=true&count=${fetchedEmails.length}`, BASE_URL)
     );
   } catch (err) {
     console.error("OAuth callback error:", err);
     return NextResponse.redirect(
-      new URL(`/?error=oauth_failed`, request.url)
+      new URL(`/?error=oauth_failed`, BASE_URL)
     );
   }
 }
