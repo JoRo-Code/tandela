@@ -1,6 +1,9 @@
 import { signIn, auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
 
+// Prevent static generation - this page checks auth state
+export const dynamic = "force-dynamic";
+
 export default async function LoginPage() {
   // If already logged in, redirect to home
   const session = await auth();

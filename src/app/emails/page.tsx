@@ -5,6 +5,9 @@ import { EmailItem } from "./email-item";
 import { SyncButton } from "./sync-button";
 import { getWorkspace } from "@/lib/auth-helpers";
 
+// Prevent static generation - this page requires auth and database
+export const dynamic = "force-dynamic";
+
 export default async function EmailsPage({
   searchParams,
 }: {

@@ -7,6 +7,9 @@ import { StatsCards } from "@/components/dashboard/stats-cards";
 import { ReviewQueue } from "@/components/dashboard/review-queue";
 import { ActivityFeed } from "@/components/dashboard/activity-feed";
 
+// Prevent static generation - this page requires auth and database
+export const dynamic = "force-dynamic";
+
 export default async function Dashboard() {
   // Check authentication
   const session = await auth();
