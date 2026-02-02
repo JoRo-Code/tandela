@@ -4,11 +4,8 @@ import { DrizzleAdapter } from "@auth/drizzle-adapter";
 import { getDb, workspaces, workspaceMembers, users, accounts, sessions, verificationTokens } from "./db";
 import { eq } from "drizzle-orm";
 
-// Get the actual db instance for the adapter
-const db = getDb();
-
 export const { handlers, auth, signIn, signOut } = NextAuth({
-  adapter: DrizzleAdapter(db, {
+  adapter: DrizzleAdapter(getDb(), {
     usersTable: users,
     accountsTable: accounts,
     sessionsTable: sessions,
@@ -30,7 +27,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         session.user.id = user.id;
 
         // Get the user's workspace membership
-        const membership = await db.query.workspaceMembers.findFirst({
+        const membership = await getDb().query.workspaceMembers.findFirst({
           where: eq(workspaceMembers.userId, user.id),
         });
 
@@ -46,6 +43,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       // Create a workspace for the new user
       const workspaceName = user.name ? `${user.name}'s Workspace` : "My Workspace";
 
+      const db = getDb();
       const [workspace] = await db
         .insert(workspaces)
         .values({ name: workspaceName })
