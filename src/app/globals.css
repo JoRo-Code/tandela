@@ -1,26 +1,112 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #f6f2e9;
+  --foreground: #1a211b;
+  --brand-ink: #1a211b;
+  --brand-ink-10: rgba(26, 33, 27, 0.1);
+  --brand-ink-20: rgba(26, 33, 27, 0.2);
+  --brand-ink-40: rgba(26, 33, 27, 0.4);
+  --brand-sand: #f6f2e9;
+  --brand-cream: #fbf7ef;
+  --brand-card: #ffffff;
+  --brand-card-80: rgba(255, 255, 255, 0.85);
+  --brand-card-70: rgba(255, 255, 255, 0.7);
+  --brand-card-60: rgba(255, 255, 255, 0.6);
+  --brand-olive: #3f5e52;
+  --brand-ember: #d6a45b;
+  --brand-ember-20: rgba(214, 164, 91, 0.2);
+  --brand-fog: #e7efea;
+  --brand-mist: #dbe7e1;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-manrope);
+  --font-mono: var(--font-jetbrains-mono);
+  --font-display: var(--font-fraunces);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --background: #0f1412;
+    --foreground: #f2eee4;
+    --brand-ink: #f2eee4;
+    --brand-ink-10: rgba(242, 238, 228, 0.1);
+    --brand-ink-20: rgba(242, 238, 228, 0.2);
+    --brand-ink-40: rgba(242, 238, 228, 0.4);
+    --brand-sand: #0f1412;
+    --brand-cream: #151b18;
+    --brand-card: #141917;
+    --brand-card-80: rgba(20, 25, 23, 0.85);
+    --brand-card-70: rgba(20, 25, 23, 0.7);
+    --brand-card-60: rgba(20, 25, 23, 0.6);
+    --brand-olive: #9eb3a6;
+    --brand-ember: #e3b56e;
+    --brand-ember-20: rgba(227, 181, 110, 0.2);
+    --brand-fog: #1b2320;
+    --brand-mist: #22302a;
   }
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans);
+}
+
+.font-display {
+  font-family: var(--font-display);
+}
+
+.text-balance {
+  text-wrap: balance;
+}
+
+.texture-grid {
+  background-image:
+    linear-gradient(to right, var(--brand-ink-10) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--brand-ink-10) 1px, transparent 1px);
+  background-size: 120px 120px;
+}
+
+.section-anchor {
+  scroll-margin-top: 110px;
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-16px);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    opacity: 0.35;
+    transform: translateX(-10%);
+  }
+  50% {
+    opacity: 0.55;
+    transform: translateX(6%);
+  }
+  100% {
+    opacity: 0.35;
+    transform: translateX(-10%);
+  }
 }

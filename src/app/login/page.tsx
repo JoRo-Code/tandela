@@ -5,10 +5,10 @@ import { redirect } from "next/navigation";
 export const dynamic = "force-dynamic";
 
 export default async function LoginPage() {
-  // If already logged in, redirect to home
+  // If already logged in, redirect to app
   const session = await auth();
   if (session?.user) {
-    redirect("/");
+    redirect("/app");
   }
 
   return (
@@ -26,7 +26,7 @@ export default async function LoginPage() {
         <form
           action={async () => {
             "use server";
-            await signIn("google", { redirectTo: "/" });
+            await signIn("google", { redirectTo: "/app" });
           }}
         >
           <button
