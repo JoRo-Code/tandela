@@ -68,6 +68,29 @@ In [Google Cloud Console](https://console.cloud.google.com/apis/credentials):
 | `GOOGLE_CLIENT_ID` | Google OAuth client ID | From Google Cloud Console |
 | `GOOGLE_CLIENT_SECRET` | Google OAuth client secret | From Google Cloud Console |
 
+## Database Migrations
+
+Railway's internal database URL (`postgres.railway.internal`) isn't accessible from your local machine. Use the public URL for migrations:
+
+```bash
+# Switch to Postgres service to get the public URL
+railway service Postgres
+railway variables  # Find DATABASE_PUBLIC_URL
+
+# Run migrations with public URL
+DATABASE_URL="postgresql://user:pass@maglev.proxy.rlwy.net:PORT/railway" npm run db:push
+
+# Switch back to app service
+railway service tandela
+```
+
+Or connect via Railway's proxy:
+
+```bash
+railway connect Postgres
+# Then run SQL directly
+```
+
 ## Deployment
 
 Railway auto-deploys on git push to the linked branch. Manual deploy:
