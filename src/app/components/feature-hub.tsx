@@ -58,14 +58,14 @@ const flows = [
   },
 ];
 
-// Node positions
+// Node positions (percentages for responsive scaling)
 const nodes = {
-  voice: { x: 60, y: 100, icon: <MicIcon />, label: "Voice" },
-  phone: { x: 60, y: 180, icon: <PhoneIcon />, label: "Calls" },
-  email: { x: 60, y: 260, icon: <EmailIcon />, label: "Email" },
-  center: { x: 180, y: 180, icon: null, label: "Tandela" },
-  records: { x: 300, y: 100, icon: <RecordsIcon />, label: "Records" },
-  calendar: { x: 300, y: 260, icon: <CalendarIcon />, label: "Calendar" },
+  voice: { x: 17, y: 25, icon: <MicIcon />, label: "Voice" },
+  phone: { x: 17, y: 50, icon: <PhoneIcon />, label: "Calls" },
+  email: { x: 17, y: 75, icon: <EmailIcon />, label: "Email" },
+  center: { x: 50, y: 50, icon: null, label: "Tandela" },
+  records: { x: 83, y: 25, icon: <RecordsIcon />, label: "Records" },
+  calendar: { x: 83, y: 75, icon: <CalendarIcon />, label: "Calendar" },
 };
 
 export function FeatureHub() {
@@ -144,50 +144,50 @@ export function FeatureHub() {
 
       {/* Hub visualization */}
       <div className="relative h-[320px] w-full">
-        <svg className="absolute inset-0 h-full w-full" viewBox="0 0 360 320">
+        <svg className="absolute inset-0 h-full w-full" viewBox="0 0 100 100" preserveAspectRatio="none">
           {/* Connection lines */}
           {/* Voice to Center */}
           <path
-            d={`M ${nodes.voice.x + 25} ${nodes.voice.y} Q 120 140 ${nodes.center.x - 30} ${nodes.center.y - 20}`}
+            d={`M ${nodes.voice.x + 7} ${nodes.voice.y} Q 33 38 ${nodes.center.x - 8} ${nodes.center.y - 5}`}
             fill="none"
             stroke={getLineState("voice", "center") === "active" ? "var(--brand-ember)" : "var(--brand-ink)"}
-            strokeWidth={getLineState("voice", "center") === "active" ? 2 : 1}
+            strokeWidth={getLineState("voice", "center") === "active" ? 0.6 : 0.3}
             strokeOpacity={getLineState("voice", "center") === "active" ? 0.8 : 0.15}
             className="transition-all duration-500"
           />
           {/* Center to Records */}
           <path
-            d={`M ${nodes.center.x + 30} ${nodes.center.y - 20} Q 240 140 ${nodes.records.x - 25} ${nodes.records.y}`}
+            d={`M ${nodes.center.x + 8} ${nodes.center.y - 5} Q 67 38 ${nodes.records.x - 7} ${nodes.records.y}`}
             fill="none"
             stroke={getLineState("center", "records") === "active" ? "var(--brand-ember)" : "var(--brand-ink)"}
-            strokeWidth={getLineState("center", "records") === "active" ? 2 : 1}
+            strokeWidth={getLineState("center", "records") === "active" ? 0.6 : 0.3}
             strokeOpacity={getLineState("center", "records") === "active" ? 0.8 : 0.15}
             className="transition-all duration-500"
           />
           {/* Phone to Center (bidirectional) */}
           <path
-            d={`M ${nodes.phone.x + 25} ${nodes.phone.y} L ${nodes.center.x - 35} ${nodes.center.y}`}
+            d={`M ${nodes.phone.x + 7} ${nodes.phone.y} L ${nodes.center.x - 10} ${nodes.center.y}`}
             fill="none"
             stroke={getLineState("phone", "center") === "active" ? "var(--brand-ember)" : "var(--brand-ink)"}
-            strokeWidth={getLineState("phone", "center") === "active" ? 2 : 1}
+            strokeWidth={getLineState("phone", "center") === "active" ? 0.6 : 0.3}
             strokeOpacity={getLineState("phone", "center") === "active" ? 0.8 : 0.15}
             className="transition-all duration-500"
           />
           {/* Center to Calendar */}
           <path
-            d={`M ${nodes.center.x + 35} ${nodes.center.y} Q 240 220 ${nodes.calendar.x - 25} ${nodes.calendar.y}`}
+            d={`M ${nodes.center.x + 10} ${nodes.center.y} Q 67 62 ${nodes.calendar.x - 7} ${nodes.calendar.y}`}
             fill="none"
             stroke={getLineState("center", "calendar") === "active" ? "var(--brand-ember)" : "var(--brand-ink)"}
-            strokeWidth={getLineState("center", "calendar") === "active" ? 2 : 1}
+            strokeWidth={getLineState("center", "calendar") === "active" ? 0.6 : 0.3}
             strokeOpacity={getLineState("center", "calendar") === "active" ? 0.8 : 0.15}
             className="transition-all duration-500"
           />
           {/* Email to Center (bidirectional) */}
           <path
-            d={`M ${nodes.email.x + 25} ${nodes.email.y} Q 120 220 ${nodes.center.x - 30} ${nodes.center.y + 20}`}
+            d={`M ${nodes.email.x + 7} ${nodes.email.y} Q 33 62 ${nodes.center.x - 8} ${nodes.center.y + 5}`}
             fill="none"
             stroke={getLineState("email", "center") === "active" ? "var(--brand-ember)" : "var(--brand-ink)"}
-            strokeWidth={getLineState("email", "center") === "active" ? 2 : 1}
+            strokeWidth={getLineState("email", "center") === "active" ? 0.6 : 0.3}
             strokeOpacity={getLineState("email", "center") === "active" ? 0.8 : 0.15}
             className="transition-all duration-500"
           />
@@ -200,23 +200,23 @@ export function FeatureHub() {
 
             let pathD = "";
             if (from === "voice" && to === "center") {
-              pathD = `M ${nodes.voice.x + 25} ${nodes.voice.y} Q 120 140 ${nodes.center.x - 30} ${nodes.center.y - 20}`;
+              pathD = `M ${nodes.voice.x + 7} ${nodes.voice.y} Q 33 38 ${nodes.center.x - 8} ${nodes.center.y - 5}`;
             } else if (from === "center" && to === "records") {
-              pathD = `M ${nodes.center.x + 30} ${nodes.center.y - 20} Q 240 140 ${nodes.records.x - 25} ${nodes.records.y}`;
+              pathD = `M ${nodes.center.x + 8} ${nodes.center.y - 5} Q 67 38 ${nodes.records.x - 7} ${nodes.records.y}`;
             } else if (from === "phone" && to === "center") {
-              pathD = `M ${nodes.phone.x + 25} ${nodes.phone.y} L ${nodes.center.x - 35} ${nodes.center.y}`;
+              pathD = `M ${nodes.phone.x + 7} ${nodes.phone.y} L ${nodes.center.x - 10} ${nodes.center.y}`;
             } else if (from === "center" && to === "calendar") {
-              pathD = `M ${nodes.center.x + 35} ${nodes.center.y} Q 240 220 ${nodes.calendar.x - 25} ${nodes.calendar.y}`;
+              pathD = `M ${nodes.center.x + 10} ${nodes.center.y} Q 67 62 ${nodes.calendar.x - 7} ${nodes.calendar.y}`;
             } else if (from === "email" && to === "center") {
-              pathD = `M ${nodes.email.x + 25} ${nodes.email.y} Q 120 220 ${nodes.center.x - 30} ${nodes.center.y + 20}`;
+              pathD = `M ${nodes.email.x + 7} ${nodes.email.y} Q 33 62 ${nodes.center.x - 8} ${nodes.center.y + 5}`;
             } else if (from === "center" && to === "email") {
-              pathD = `M ${nodes.center.x - 30} ${nodes.center.y + 20} Q 120 220 ${nodes.email.x + 25} ${nodes.email.y}`;
+              pathD = `M ${nodes.center.x - 8} ${nodes.center.y + 5} Q 33 62 ${nodes.email.x + 7} ${nodes.email.y}`;
             }
 
             if (!pathD) return null;
 
             return (
-              <circle key={`dot-${idx}`} r="5" fill="var(--brand-ember)">
+              <circle key={`dot-${idx}`} r="1.5" fill="var(--brand-ember)">
                 <animateMotion dur="0.8s" repeatCount="indefinite" path={pathD} />
               </circle>
             );
@@ -230,12 +230,12 @@ export function FeatureHub() {
           return (
             <div
               key={nodeId}
-              className={`absolute transition-all duration-500 ${isVisible ? "scale-100 opacity-100" : "scale-0 opacity-0"}`}
-              style={{ left: node.x, top: node.y, transform: "translate(-50%, -50%)" }}
+              className={`absolute -translate-x-1/2 -translate-y-1/2 transition-all duration-500 ${isVisible ? "scale-100 opacity-100" : "scale-0 opacity-0"}`}
+              style={{ left: `${node.x}%`, top: `${node.y}%` }}
             >
               <div className="flex flex-col items-center gap-1.5">
                 <div
-                  className={`flex h-12 w-12 items-center justify-center rounded-full border-2 transition-all duration-300 ${
+                  className={`flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-full border-2 transition-all duration-300 ${
                     state === "active"
                       ? "border-[var(--brand-ember)] bg-[var(--brand-card)] shadow-lg scale-110"
                       : state === "completed"
@@ -247,7 +247,7 @@ export function FeatureHub() {
                     {node.icon}
                   </span>
                 </div>
-                <span className={`text-xs font-medium ${state === "active" ? "text-[var(--brand-ink)]" : "text-[var(--brand-olive)]"}`}>
+                <span className={`text-[10px] sm:text-xs font-medium ${state === "active" ? "text-[var(--brand-ink)]" : "text-[var(--brand-olive)]"}`}>
                   {node.label}
                 </span>
               </div>
@@ -257,17 +257,17 @@ export function FeatureHub() {
 
         {/* Center hub (Tandela) */}
         <div
-          className={`absolute transition-all duration-700 ${isVisible ? "scale-100 opacity-100" : "scale-50 opacity-0"}`}
-          style={{ left: nodes.center.x, top: nodes.center.y, transform: "translate(-50%, -50%)" }}
+          className={`absolute -translate-x-1/2 -translate-y-1/2 transition-all duration-700 ${isVisible ? "scale-100 opacity-100" : "scale-50 opacity-0"}`}
+          style={{ left: `${nodes.center.x}%`, top: `${nodes.center.y}%` }}
         >
           <div className="relative">
-            <div className={`absolute -inset-4 rounded-full blur-xl transition-all duration-500 ${getNodeState("center") === "active" ? "bg-[var(--brand-ember-20)] animate-pulse" : "bg-[var(--brand-ink-10)]"}`} />
-            <div className={`relative flex h-16 w-16 items-center justify-center rounded-full border-2 transition-all duration-300 ${
+            <div className={`absolute -inset-3 sm:-inset-4 rounded-full blur-xl transition-all duration-500 ${getNodeState("center") === "active" ? "bg-[var(--brand-ember-20)] animate-pulse" : "bg-[var(--brand-ink-10)]"}`} />
+            <div className={`relative flex h-12 w-12 sm:h-16 sm:w-16 items-center justify-center rounded-full border-2 transition-all duration-300 ${
               getNodeState("center") === "active"
                 ? "border-[var(--brand-ember)] bg-[var(--brand-card)] shadow-xl scale-110"
                 : "border-[var(--brand-ink-20)] bg-[var(--brand-card)] shadow-lg"
             }`}>
-              <span className="text-2xl font-bold text-[var(--brand-ink)]">T</span>
+              <span className="text-xl sm:text-2xl font-bold text-[var(--brand-ink)]">T</span>
             </div>
           </div>
         </div>
@@ -279,12 +279,12 @@ export function FeatureHub() {
           return (
             <div
               key={nodeId}
-              className={`absolute transition-all duration-500 ${isVisible ? "scale-100 opacity-100" : "scale-0 opacity-0"}`}
-              style={{ left: node.x, top: node.y, transform: "translate(-50%, -50%)" }}
+              className={`absolute -translate-x-1/2 -translate-y-1/2 transition-all duration-500 ${isVisible ? "scale-100 opacity-100" : "scale-0 opacity-0"}`}
+              style={{ left: `${node.x}%`, top: `${node.y}%` }}
             >
               <div className="flex flex-col items-center gap-1.5">
                 <div
-                  className={`flex h-12 w-12 items-center justify-center rounded-full border-2 transition-all duration-300 ${
+                  className={`flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-full border-2 transition-all duration-300 ${
                     state === "active"
                       ? "border-[var(--brand-ember)] bg-[var(--brand-card)] shadow-lg scale-110"
                       : state === "completed"
@@ -296,7 +296,7 @@ export function FeatureHub() {
                     {node.icon}
                   </span>
                 </div>
-                <span className={`text-xs font-medium ${state === "active" ? "text-[var(--brand-ink)]" : "text-[var(--brand-olive)]"}`}>
+                <span className={`text-[10px] sm:text-xs font-medium ${state === "active" ? "text-[var(--brand-ink)]" : "text-[var(--brand-olive)]"}`}>
                   {node.label}
                 </span>
               </div>
