@@ -1,56 +1,57 @@
 import Link from "next/link";
+import { FeatureHub } from "./components/feature-hub";
 
 const workflowSteps = [
   {
-    title: "Connect and map intent",
+    title: "Connect your clinic",
     description:
-      "Securely connect Gmail, define response categories, and set your routing rules.",
+      "Link your phone line and calendar. Set your booking rules and clinic policies.",
   },
   {
-    title: "Drafts appear in minutes",
+    title: "Calls and emails handled automatically",
     description:
-      "Tandela turns emails into structured drafts with the right tone and context.",
+      "Tandela answers patient inquiries, books appointments, and sends confirmations.",
   },
   {
-    title: "Approve, send, learn",
+    title: "Capture notes hands-free",
     description:
-      "Your team reviews the queue, approves responses, and builds trust with every send.",
+      "Dictate during or after appointments. Tandela structures and saves your records.",
   },
 ];
 
 const featureHighlights = [
   {
-    title: "Intent-aware triage",
+    title: "Patient-aware responses",
     description:
-      "Cluster similar requests, detect urgency, and keep priority conversations on top.",
+      "Pulls appointment history and preferences into every interaction.",
   },
   {
-    title: "Human-in-the-loop control",
+    title: "Human handoff when needed",
     description:
-      "Every response is reviewable with side-by-side context and suggested edits.",
+      "Complex cases get routed to your team with full context.",
   },
   {
-    title: "Context memory",
+    title: "Structured clinical notes",
     description:
-      "Pulls customer history, bookings, and policies into drafts automatically.",
+      "Voice becomes organized records, ready for your system.",
   },
 ];
 
 const planCards = [
   {
-    title: "Starter",
-    description: "For lean teams piloting AI-assisted inbox workflows.",
-    details: ["Shared review queue", "Draft approval", "Basic analytics"],
+    title: "Receptionist",
+    description: "Automate your front desk calls and patient emails.",
+    details: ["24/7 call answering", "Appointment booking", "Patient inquiries"],
   },
   {
-    title: "Growth",
-    description: "For customer-obsessed teams scaling response volume.",
-    details: ["Multi-inbox routing", "Custom playbooks", "Team performance views"],
+    title: "Secretary",
+    description: "Hands-free clinical notes and visit documentation.",
+    details: ["Voice-to-notes", "During-procedure capture", "Structured records"],
   },
   {
-    title: "Enterprise",
-    description: "For regulated or high-volume ops with strict controls.",
-    details: ["Dedicated environments", "Advanced audit logs", "Priority onboarding"],
+    title: "Complete",
+    description: "Full coverage from first call to final chart.",
+    details: ["Receptionist + Secretary", "Multi-location support", "Priority onboarding"],
   },
 ];
 
@@ -81,10 +82,10 @@ export default function HomePage() {
               How it works
             </a>
             <a className="transition hover:text-[var(--brand-ink)]" href="#pricing">
-              Plans
+              Products
             </a>
             <a className="transition hover:text-[var(--brand-ink)]" href="#security">
-              Trust
+              Security
             </a>
           </nav>
           <div className="flex items-center gap-3">
@@ -108,20 +109,20 @@ export default function HomePage() {
           <section className="grid items-center gap-12 pb-20 pt-6 lg:grid-cols-[1.05fr_0.95fr]">
             <div className="space-y-6 motion-reduce:animate-none animate-[rise_0.8s_ease-out_both]">
               <div className="inline-flex items-center gap-2 rounded-full border border-[var(--brand-ink-20)] bg-[var(--brand-cream)] px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-[var(--brand-olive)]">
-                AI inbox operations
+                AI for dental clinics
               </div>
               <h1 className="text-balance font-display text-4xl leading-[1.05] text-[var(--brand-ink)] sm:text-5xl lg:text-6xl">
-                Turn your inbox into a calm, automated pipeline.
+                Your front desk and chairside assistant, always on.
               </h1>
               <p className="text-lg text-[var(--brand-olive)] sm:text-xl">
-                Tandela triages inbound email, drafts responses, and keeps every send under human control, so your team stays fast, consistent, and unburdened.
+                Tandela handles patient calls, books appointments, and captures clinical notes — so your team can focus on care, not admin.
               </p>
               <div className="flex flex-col gap-3 sm:flex-row">
                 <Link
                   href="/login"
                   className="rounded-full bg-[var(--brand-ink)] px-6 py-3 text-center text-sm font-semibold text-[var(--brand-sand)] shadow-lg shadow-[var(--brand-ink-20)] transition hover:translate-y-[-1px]"
                 >
-                  Start with Gmail
+                  Book a demo
                 </Link>
                 <a
                   href="#workflow"
@@ -131,97 +132,31 @@ export default function HomePage() {
                 </a>
               </div>
               <div className="flex flex-wrap gap-4 text-sm text-[var(--brand-olive)]">
-                <span>Human approval queue</span>
-                <span>Audit-ready activity log</span>
-                <span>Works with your policies</span>
+                <span>24/7 call handling</span>
+                <span>Hands-free charting</span>
+                <span>HIPAA-ready</span>
               </div>
             </div>
 
             <div className="relative motion-reduce:animate-none animate-[rise_1s_ease-out_both]">
               <div className="absolute -inset-6 rounded-[32px] bg-[radial-gradient(circle_at_top,_var(--brand-ember-20)_0,_transparent_70%)] opacity-80 blur-2xl" />
-              <div className="relative rounded-[32px] border border-[var(--brand-ink-10)] bg-[var(--brand-card-80)] p-6 shadow-[0_24px_70px_rgba(26,33,27,0.18)] backdrop-blur">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.3em] text-[var(--brand-olive)]">
-                      Inbox control
-                    </p>
-                    <p className="mt-2 text-lg font-semibold text-[var(--brand-ink)]">
-                      Tandela Review Queue
-                    </p>
-                  </div>
-                  <div className="rounded-full bg-[var(--brand-ink)] px-3 py-1 text-xs font-semibold text-[var(--brand-sand)]">
-                    Live
-                  </div>
-                </div>
-                <div className="mt-6 space-y-3">
-                  {[
-                    {
-                      label: "Reservation request",
-                      status: "Auto-draft ready",
-                      body: "Guest asking to move booking to Friday, includes policy match.",
-                    },
-                    {
-                      label: "Billing question",
-                      status: "Needs review",
-                      body: "Invoice update requested, refund rules applied and drafted.",
-                    },
-                    {
-                      label: "Vendor inquiry",
-                      status: "Queued",
-                      body: "New supplier onboarding details prepared with checklist.",
-                    },
-                  ].map((item) => (
-                    <div
-                      key={item.label}
-                      className="rounded-2xl border border-[var(--brand-ink-10)] bg-[var(--brand-card)] p-4"
-                    >
-                      <div className="flex items-center justify-between text-xs font-semibold uppercase tracking-[0.2em] text-[var(--brand-olive)]">
-                        <span>{item.label}</span>
-                        <span className="rounded-full bg-[var(--brand-ember-20)] px-2 py-1 text-[10px] text-[var(--brand-ink)]">
-                          {item.status}
-                        </span>
-                      </div>
-                      <p className="mt-2 text-sm text-[var(--brand-ink)]">
-                        {item.body}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-                <div className="mt-6 grid gap-3 sm:grid-cols-2">
-                  <div className="rounded-2xl border border-[var(--brand-ink-10)] bg-[var(--brand-cream)] p-4">
-                    <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--brand-olive)]">
-                      Response tone
-                    </p>
-                    <p className="mt-2 text-sm font-semibold text-[var(--brand-ink)]">
-                      Calm, concierge, policy-aware
-                    </p>
-                  </div>
-                  <div className="rounded-2xl border border-[var(--brand-ink-10)] bg-[var(--brand-cream)] p-4">
-                    <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--brand-olive)]">
-                      Queue health
-                    </p>
-                    <p className="mt-2 text-sm font-semibold text-[var(--brand-ink)]">
-                      Review coverage: always on
-                    </p>
-                  </div>
-                </div>
-              </div>
+              <FeatureHub />
             </div>
           </section>
 
           <section className="grid gap-8 pb-20 lg:grid-cols-3">
             {[
               {
-                title: "Operations teams",
-                copy: "Give your support crew a focused queue instead of a chaotic inbox.",
+                title: "Solo practices",
+                copy: "Handle every call and keep perfect records, even with a small team.",
               },
               {
-                title: "Service businesses",
-                copy: "Turn requests into bookings with consistent, fast replies.",
+                title: "Multi-location clinics",
+                copy: "Consistent patient experience across all your locations.",
               },
               {
-                title: "Customer success",
-                copy: "Stay proactive with follow-ups and guardrails for every account.",
+                title: "Busy front desks",
+                copy: "Let your staff focus on patients in the chair, not the phone.",
               },
             ].map((item) => (
               <div
@@ -240,14 +175,14 @@ export default function HomePage() {
             <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
               <div>
                 <p className="text-sm font-semibold uppercase tracking-[0.3em] text-[var(--brand-olive)]">
-                  Workflow
+                  How it works
                 </p>
                 <h2 className="mt-4 font-display text-3xl text-[var(--brand-ink)] sm:text-4xl">
-                  A calm, repeatable path for every inbound email.
+                  From first call to finished chart, handled.
                 </h2>
               </div>
               <p className="max-w-xl text-base text-[var(--brand-olive)]">
-                Tandela keeps your team in control with structured queues, automatic drafts, and clear ownership across every inbox.
+                Tandela automates the admin so your team can stay focused on what matters — patient care.
               </p>
             </div>
             <div className="mt-10 grid gap-6 lg:grid-cols-3">
@@ -277,21 +212,21 @@ export default function HomePage() {
                   Product
                 </p>
                 <h2 className="mt-4 font-display text-3xl text-[var(--brand-ink)] sm:text-4xl">
-                  Purpose-built for inbox operations, not generic chat.
+                  Purpose-built for dental clinics, not generic AI.
                 </h2>
               </div>
               <p className="max-w-xl text-base text-[var(--brand-olive)]">
-                Built to manage real queues and policies, Tandela gives your team the context they need without switching tools.
+                Built to understand dental workflows, Tandela handles patient communication and clinical documentation with precision.
               </p>
             </div>
 
             <div className="mt-10 grid gap-6 lg:grid-cols-3">
               <div className="rounded-3xl border border-[var(--brand-ink-10)] bg-[var(--brand-card)] p-6 shadow-sm lg:col-span-2">
                 <h3 className="text-xl font-semibold text-[var(--brand-ink)]">
-                  All conversations, one live workspace.
+                  Two products, one seamless experience.
                 </h3>
                 <p className="mt-3 text-sm text-[var(--brand-olive)]">
-                  Track ownership, SLAs, and next actions. Tandela keeps every email routed to the right person with clear context.
+                  Receptionist handles calls and emails. Secretary captures clinical notes. Together, they cover your entire admin workflow.
                 </p>
                 <div className="mt-6 grid gap-4 sm:grid-cols-3">
                   {featureHighlights.slice(0, 3).map((feature) => (
@@ -312,26 +247,26 @@ export default function HomePage() {
 
               <div className="rounded-3xl border border-[var(--brand-ink-10)] bg-[var(--brand-cream)] p-6 shadow-sm">
                 <h3 className="text-lg font-semibold text-[var(--brand-ink)]">
-                  Guardrails built-in.
+                  Clinic rules built-in.
                 </h3>
                 <p className="mt-3 text-sm text-[var(--brand-olive)]">
-                  Define policies once and apply them everywhere, from refunds to escalations.
+                  Define your booking policies, hours, and escalation rules once.
                 </p>
                 <div className="mt-6 space-y-3 text-sm text-[var(--brand-ink)]">
                   <div className="flex items-center justify-between rounded-xl border border-[var(--brand-ink-10)] bg-[var(--brand-card-70)] px-4 py-3">
-                    <span>Escalate VIPs</span>
+                    <span>Emergency escalation</span>
                     <span className="text-xs font-semibold text-[var(--brand-olive)]">
                       Active
                     </span>
                   </div>
                   <div className="flex items-center justify-between rounded-xl border border-[var(--brand-ink-10)] bg-[var(--brand-card-70)] px-4 py-3">
-                    <span>Refund policy check</span>
+                    <span>Booking buffer rules</span>
                     <span className="text-xs font-semibold text-[var(--brand-olive)]">
                       Active
                     </span>
                   </div>
                   <div className="flex items-center justify-between rounded-xl border border-[var(--brand-ink-10)] bg-[var(--brand-card-70)] px-4 py-3">
-                    <span>Legal review required</span>
+                    <span>Insurance verification</span>
                     <span className="text-xs font-semibold text-[var(--brand-olive)]">
                       Optional
                     </span>
@@ -343,12 +278,12 @@ export default function HomePage() {
                 id="security"
                 className="section-anchor rounded-3xl border border-[var(--brand-ink-10)] bg-[var(--brand-ink)] p-6 text-[var(--brand-sand)] shadow-sm lg:col-span-2"
               >
-                <h3 className="text-xl font-semibold">Trust-ready from day one.</h3>
+                <h3 className="text-xl font-semibold">HIPAA-ready from day one.</h3>
                 <p className="mt-3 text-sm text-[var(--brand-sand)]/80">
-                  Keep data where it belongs with role-based access, audit trails, and configurable retention.
+                  Patient data stays protected with encryption, access controls, and audit trails.
                 </p>
                 <div className="mt-6 grid gap-4 sm:grid-cols-3">
-                  {["Audit trails", "Role permissions", "Scoped access"].map((item) => (
+                  {["Data encryption", "Access controls", "Audit trails"].map((item) => (
                     <div
                       key={item}
                       className="rounded-2xl border border-white/10 bg-white/5 p-4 text-sm"
@@ -361,16 +296,16 @@ export default function HomePage() {
 
               <div className="rounded-3xl border border-[var(--brand-ink-10)] bg-[var(--brand-cream)] p-6 shadow-sm">
                 <h3 className="text-lg font-semibold text-[var(--brand-ink)]">
-                  Visibility that sticks.
+                  Know how your clinic is doing.
                 </h3>
                 <p className="mt-3 text-sm text-[var(--brand-olive)]">
-                  Track response times, approval queues, and coverage across teams.
+                  Track call volume, booking rates, and documentation coverage.
                 </p>
                 <div className="mt-6 space-y-3">
                   {[
-                    "Response queue health",
-                    "Coverage by team",
-                    "Approval turnaround",
+                    "Calls answered today",
+                    "Appointments booked",
+                    "Notes captured",
                   ].map((item) => (
                     <div
                       key={item}
@@ -388,14 +323,14 @@ export default function HomePage() {
             <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
               <div>
                 <p className="text-sm font-semibold uppercase tracking-[0.3em] text-[var(--brand-olive)]">
-                  Plans
+                  Products
                 </p>
                 <h2 className="mt-4 font-display text-3xl text-[var(--brand-ink)] sm:text-4xl">
-                  Choose the rollout that fits your inbox volume.
+                  Choose what fits your clinic.
                 </h2>
               </div>
               <p className="max-w-xl text-base text-[var(--brand-olive)]">
-                Start small, then scale into multi-inbox operations with custom guardrails and deeper analytics.
+                Start with one product or get both for complete coverage from first call to finished chart.
               </p>
             </div>
             <div className="mt-10 grid gap-6 lg:grid-cols-3">
@@ -432,26 +367,26 @@ export default function HomePage() {
           <section className="rounded-[32px] border border-[var(--brand-ink-10)] bg-[var(--brand-ink)] px-6 py-16 text-center text-[var(--brand-sand)] shadow-sm">
             <div className="mx-auto max-w-2xl">
               <p className="text-sm font-semibold uppercase tracking-[0.3em] text-[var(--brand-sand)]/70">
-                Ready to calm your inbox?
+                Ready to focus on patient care?
               </p>
               <h2 className="mt-4 font-display text-3xl sm:text-4xl">
-                Get Tandela running in your workflow this week.
+                Get Tandela running in your clinic this week.
               </h2>
               <p className="mt-4 text-base text-[var(--brand-sand)]/80">
-                Connect Gmail, define response playbooks, and let Tandela handle the routine so you can focus on the high-touch work.
+                Connect your phone line, set your booking rules, and let Tandela handle the admin so you can focus on your patients.
               </p>
               <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-center">
                 <Link
                   href="/login"
                   className="rounded-full bg-[var(--brand-sand)] px-6 py-3 text-sm font-semibold text-[var(--brand-ink)]"
                 >
-                  Start now
+                  Book a demo
                 </Link>
                 <a
                   href="#product"
                   className="rounded-full border border-white/20 px-6 py-3 text-sm font-semibold text-[var(--brand-sand)]"
                 >
-                  Explore product
+                  Explore products
                 </a>
               </div>
             </div>
@@ -470,10 +405,10 @@ export default function HomePage() {
               Product
             </a>
             <a href="#workflow" className="transition hover:text-[var(--brand-ink)]">
-              Workflow
+              How it works
             </a>
             <a href="#pricing" className="transition hover:text-[var(--brand-ink)]">
-              Plans
+              Products
             </a>
             <Link href="/login" className="transition hover:text-[var(--brand-ink)]">
               Sign in
