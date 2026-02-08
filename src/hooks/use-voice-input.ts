@@ -2,97 +2,52 @@
 
 import { useState, useCallback, useRef, useEffect } from "react";
 
-// Web Speech API types (not in all TS libs)
-interface SpeechRecognitionEvent extends Event {
-  resultIndex: number;
-  results: SpeechRecognitionResultList;
-}
-
-interface SpeechRecognitionErrorEvent extends Event {
-  error: string;
-}
-
-interface SpeechRecognitionInstance extends EventTarget {
-  lang: string;
-  continuous: boolean;
-  interimResults: boolean;
-  onresult: ((event: SpeechRecognitionEvent) => void) | null;
-  onerror: ((event: SpeechRecognitionErrorEvent) => void) | null;
-  onend: (() => void) | null;
-  start(): void;
-  stop(): void;
-}
-
-declare global {
-  interface Window {
-    SpeechRecognition?: new () => SpeechRecognitionInstance;
-    webkitSpeechRecognition?: new () => SpeechRecognitionInstance;
-  }
-}
-
 interface UseVoiceInputReturn {
   isListening: boolean;
-  transcript: string;
   start: () => void;
   stop: () => void;
   toggle: () => void;
   supported: boolean;
 }
 
-export function useVoiceInput(onResult: (transcript: string) => void): UseVoiceInputReturn {
+export function useVoiceInput(onRecording: (audio: Blob) => void): UseVoiceInputReturn {
   const [isListening, setIsListening] = useState(false);
-  const [transcript, setTranscript] = useState("");
   const [supported, setSupported] = useState(false);
-  const recognitionRef = useRef<SpeechRecognitionInstance | null>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
 
   useEffect(() => {
-    setSupported("SpeechRecognition" in window || "webkitSpeechRecognition" in window);
+    setSupported(typeof navigator !== "undefined" && !!navigator.mediaDevices?.getUserMedia);
   }, []);
 
-  const start = useCallback(() => {
+  const start = useCallback(async () => {
     if (!supported) return;
 
-    const Ctor = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!Ctor) return;
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream, { mimeType: "audio/webm" });
+      chunksRef.current = [];
 
-    const recognition = new Ctor();
-    recognition.lang = "sv-SE";
-    recognition.continuous = true;
-    recognition.interimResults = true;
+      mediaRecorder.ondataavailable = (e) => {
+        if (e.data.size > 0) chunksRef.current.push(e.data);
+      };
 
-    let finalTranscript = "";
+      mediaRecorder.onstop = () => {
+        const blob = new Blob(chunksRef.current, { type: "audio/webm" });
+        stream.getTracks().forEach((t) => t.stop());
+        if (blob.size > 0) onRecording(blob);
+      };
 
-    recognition.onresult = (event: SpeechRecognitionEvent) => {
-      let interim = "";
-      for (let i = event.resultIndex; i < event.results.length; i++) {
-        const result = event.results[i];
-        if (result.isFinal) {
-          finalTranscript += result[0].transcript + " ";
-          onResult(result[0].transcript.trim());
-        } else {
-          interim += result[0].transcript;
-        }
-      }
-      setTranscript((finalTranscript + interim).trim());
-    };
-
-    recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
-      console.error("Speech recognition error:", event.error);
-      setIsListening(false);
-    };
-
-    recognition.onend = () => {
-      setIsListening(false);
-    };
-
-    recognitionRef.current = recognition;
-    recognition.start();
-    setIsListening(true);
-    setTranscript("");
-  }, [supported, onResult]);
+      mediaRecorderRef.current = mediaRecorder;
+      mediaRecorder.start();
+      setIsListening(true);
+    } catch (err) {
+      console.error("Mic access error:", err);
+    }
+  }, [supported, onRecording]);
 
   const stop = useCallback(() => {
-    recognitionRef.current?.stop();
+    mediaRecorderRef.current?.stop();
     setIsListening(false);
   }, []);
 
@@ -104,5 +59,5 @@ export function useVoiceInput(onResult: (transcript: string) => void): UseVoiceI
     }
   }, [isListening, start, stop]);
 
-  return { isListening, transcript, start, stop, toggle, supported };
+  return { isListening, start, stop, toggle, supported };
 }

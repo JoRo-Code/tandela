@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 
-const client = new Anthropic();
+const anthropic = new Anthropic();
 
 const TOOL_DEFINITION: Anthropic.Tool = {
   name: "record",
@@ -80,33 +80,70 @@ When the clinician gives two numbers for a tooth (e.g. "16 5 4" or "16 distal 5 
 
 NEVER call record() without at least one measurement field. Every call must change something.`;
 
+async function transcribeAudio(audioBytes: ArrayBuffer): Promise<string> {
+  const formData = new FormData();
+  formData.append("file", new Blob([audioBytes], { type: "audio/webm" }), "recording.webm");
+  formData.append("model_id", "scribe_v2");
+  formData.append("language_code", "sv");
+
+  const res = await fetch("https://api.elevenlabs.io/v1/speech-to-text", {
+    method: "POST",
+    headers: {
+      "xi-api-key": process.env.ELEVENLABS_API_KEY!,
+    },
+    body: formData,
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`ElevenLabs STT error ${res.status}: ${text}`);
+  }
+
+  const data = await res.json();
+  return data.text || "";
+}
+
+async function interpretTranscript(transcript: string) {
+  const response = await anthropic.messages.create({
+    model: "claude-sonnet-4-5-20250929",
+    max_tokens: 1024,
+    system: SYSTEM_PROMPT,
+    tools: [TOOL_DEFINITION],
+    tool_choice: { type: "any" },
+    messages: [{ role: "user", content: transcript }],
+  });
+
+  return response.content
+    .filter((block): block is Anthropic.ToolUseBlock => block.type === "tool_use")
+    .map((block) => block.input as Record<string, unknown>);
+}
+
 export async function POST(request: NextRequest) {
   try {
-    const { transcript } = await request.json();
+    const formData = await request.formData();
+    const audioFile = formData.get("audio") as Blob | null;
 
-    if (!transcript || typeof transcript !== "string") {
-      return NextResponse.json({ error: "Missing transcript" }, { status: 400 });
+    if (!audioFile) {
+      return NextResponse.json({ error: "Missing audio" }, { status: 400 });
     }
 
-    const response = await client.messages.create({
-      model: "claude-sonnet-4-5-20250929",
-      max_tokens: 1024,
-      system: SYSTEM_PROMPT,
-      tools: [TOOL_DEFINITION],
-      tool_choice: { type: "any" },
-      messages: [{ role: "user", content: transcript }],
-    });
+    const audioBytes = await audioFile.arrayBuffer();
 
-    // Extract tool calls
-    const toolCalls = response.content
-      .filter((block): block is Anthropic.ToolUseBlock => block.type === "tool_use")
-      .map((block) => block.input as Record<string, unknown>);
+    // Step 1: ElevenLabs STT
+    const transcript = await transcribeAudio(audioBytes);
 
-    return NextResponse.json({ actions: toolCalls, transcript });
+    if (!transcript.trim()) {
+      return NextResponse.json({ transcript: "", actions: [] });
+    }
+
+    // Step 2: Claude interpretation
+    const actions = await interpretTranscript(transcript);
+
+    return NextResponse.json({ transcript, actions });
   } catch (error) {
     console.error("Perio voice error:", error);
     return NextResponse.json(
-      { error: "Failed to interpret voice input" },
+      { error: "Failed to process voice input" },
       { status: 500 },
     );
   }
