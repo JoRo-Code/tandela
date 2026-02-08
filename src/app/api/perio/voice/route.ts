@@ -9,7 +9,7 @@ const TOOL_DEFINITION: Anthropic.Tool = {
     "Record periodontal measurements for a tooth. Use this for every value the clinician dictates. " +
     "All measurement fields are optional — only set the ones mentioned. " +
     "Tooth numbers follow FDI notation (11-18, 21-28, 31-38, 41-48). " +
-    "Site is D (distal) or M (mesial). " +
+    "Site is D (distal), B (buccal), M (mesial), P (palatinal), or L (lingual). " +
     "If the clinician says a tooth is missing (saknas), set missing=true and omit site/measurements.",
   input_schema: {
     type: "object" as const,
@@ -107,7 +107,13 @@ CRITICAL RULES:
 - When a clinician says a number after a tooth/site, it is ALWAYS pocketDepth unless they explicitly say "marginal gingiva" or "recession".
 - When they just say a tooth number and site with no qualifier, they are about to give pocket depth — but if you only hear the tooth/site, still record pocketDepth=0 as a placeholder rather than calling with no values.
 - A bare number like "5" or "4" after mentioning a tooth = pocketDepth.
-- Make one tool call per site. If multiple sites are mentioned, make multiple calls.
+- Make one tool call per tooth per site. If multiple teeth or sites are mentioned, make multiple calls.
+
+MULTI-TOOTH SHORTHAND:
+When the clinician says multiple tooth numbers together (e.g. "3132" or "31 32"), followed by measurements, apply the SAME measurements to ALL mentioned teeth. Each tooth gets its own tool call.
+- "3132 plack bukalt" → TWO calls: record(tooth=31, site="B", plaque=true), record(tooth=32, site="B", plaque=true)
+- "1112 distal 5" → TWO calls: record(tooth=11, site="D", pocketDepth=5), record(tooth=12, site="D", pocketDepth=5)
+- "313233 blödning mesial" → THREE calls: one per tooth, all with site="M", bleeding=true
 
 Common Swedish dental speech patterns:
 - "tand 16 distal 5" → record(tooth=16, site="D", pocketDepth=5)
@@ -122,7 +128,12 @@ Common Swedish dental speech patterns:
 - "marg gingiva minus 2" or "recession 2" → gingivalMargin=-2
 - "distal 5 mesial 3" → two calls: site="D" pocketDepth=5, site="M" pocketDepth=3
 
-The transcriptions often contain speech-to-text errors — misspelled dental terms, split tooth numbers ("ett åtta" = 18, "1.7" = 17), garbled site names. Use your knowledge of dental terminology and the context to infer the intended meaning.
+Common transcription errors to watch for:
+- "dukalt" or "dukat" = bukalt (buccal, site="B")
+- "ett åtta" = 18 (tooth number), "1.7" = 17
+- "palatinal" variations: "palatal", "palatinalt" = P
+- "lingual" variations: "lingualt" = L
+The transcriptions often contain speech-to-text errors — misspelled dental terms, split tooth numbers, garbled site names. Use your knowledge of dental terminology and the context to infer the intended meaning.
 
 You have the full conversation history. When a site or number is mentioned without a tooth, use the most recently mentioned tooth.
 
