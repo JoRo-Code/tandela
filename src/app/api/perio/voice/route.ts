@@ -56,9 +56,28 @@ const TOOL_DEFINITION: Anthropic.Tool = {
   },
 };
 
+const CLARIFY_TOOL: Anthropic.Tool = {
+  name: "clarify",
+  description:
+    "Ask the clinician for clarification when the dictation is unclear or ambiguous. " +
+    "Use this instead of guessing when you can't confidently interpret what was said.",
+  input_schema: {
+    type: "object" as const,
+    properties: {
+      message: {
+        type: "string",
+        description: "A short clarification question in Swedish",
+      },
+    },
+    required: ["message"],
+  },
+};
+
 const SYSTEM_PROMPT = `You are an assistant helping a Swedish dental clinician record periodontal examination data.
 
 The clinician dictates measurements in Swedish. Call the "record" tool for EVERY measurement — you MUST always include at least one measurement value (pocketDepth, bleeding, plaque, furcation, gingivalMargin, or missing).
+
+If the dictation is unclear, garbled, or you cannot confidently determine what was said, use the "clarify" tool to ask a short question in Swedish. Do NOT guess — it is better to ask than to record wrong data. If the transcript is just filler sounds (e.g. "mhm", "eh", "okej") with no dental data, do not call any tool.
 
 CRITICAL RULES:
 - When a clinician says a number after a tooth/site, it is ALWAYS pocketDepth unless they explicitly say "marginal gingiva" or "recession".
@@ -75,6 +94,10 @@ Common Swedish dental speech patterns:
 - "marg gingiva minus 2" or "recession 2" → gingivalMargin=-2
 - "distal 5 3" means distal pocketDepth=5, mesial pocketDepth=3
 - "5 4" for a tooth means distal=5, mesial=4 (two calls)
+
+Common transcription errors to watch for:
+- "dukalt" or "dukat" = bukalt (buccal)
+- "ett åtta" = 18 (tooth number)
 
 When the clinician gives two numbers for a tooth (e.g. "16 5 4" or "16 distal 5 mesial 4"), make TWO tool calls — one per site.
 
@@ -100,18 +123,23 @@ export async function POST(request: NextRequest) {
       model: "claude-sonnet-4-5-20250929",
       max_tokens: 1024,
       system: SYSTEM_PROMPT,
-      tools: [TOOL_DEFINITION],
+      tools: [TOOL_DEFINITION, CLARIFY_TOOL],
       tool_choice: { type: "auto" },
       messages,
     });
 
-    const toolCalls = response.content
+    const allToolCalls = response.content
       .filter((block): block is Anthropic.ToolUseBlock => block.type === "tool_use")
       .map((block) => ({ id: block.id, name: block.name, input: block.input as Record<string, unknown> }));
 
+    const toolCalls = allToolCalls.filter((tc) => tc.name === "record");
     const actions = toolCalls.map((tc) => tc.input);
 
-    return NextResponse.json({ actions, toolCalls });
+    const clarifications = allToolCalls
+      .filter((tc) => tc.name === "clarify")
+      .map((tc) => (tc.input as { message: string }).message);
+
+    return NextResponse.json({ actions, toolCalls: allToolCalls, clarifications });
   } catch (error) {
     console.error("Perio voice error:", error);
     return NextResponse.json(

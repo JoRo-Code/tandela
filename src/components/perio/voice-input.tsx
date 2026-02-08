@@ -26,7 +26,7 @@ interface RecordAction {
 interface ToolCall {
   id: string;
   name: string;
-  input: RecordAction;
+  input: Record<string, unknown>;
 }
 
 interface ConversationTurn {
@@ -148,6 +148,7 @@ interface LogEntry {
   transcript: string;
   actions: RecordAction[];
   appliedCount: number;
+  clarifications: string[];
   status: "pending" | "done" | "error";
 }
 
@@ -178,7 +179,7 @@ export function VoiceInput({ dispatch }: VoiceInputProps) {
       pendingRef.current = pendingRef.current.then(async () => {
         const id = ++logId;
         const startTime = performance.now();
-        setLog((prev) => [...prev, { id, transcript, actions: [], appliedCount: 0, status: "pending" }]);
+        setLog((prev) => [...prev, { id, transcript, actions: [], appliedCount: 0, clarifications: [], status: "pending" }]);
 
         try {
           const messages = buildMessages(conversationHistoryRef.current, transcript);
@@ -191,9 +192,10 @@ export function VoiceInput({ dispatch }: VoiceInputProps) {
 
           if (!res.ok) throw new Error("API error");
 
-          const { actions, toolCalls } = await res.json() as {
+          const { actions, toolCalls, clarifications = [] } = await res.json() as {
             actions: RecordAction[];
             toolCalls: ToolCall[];
+            clarifications: string[];
           };
 
           let appliedCount = 0;
@@ -227,7 +229,7 @@ export function VoiceInput({ dispatch }: VoiceInputProps) {
           console.log("[perio-voice-trace]", trace);
 
           setLog((prev) =>
-            prev.map((e) => (e.id === id ? { ...e, actions, appliedCount, status: "done" as const } : e)),
+            prev.map((e) => (e.id === id ? { ...e, actions, appliedCount, clarifications, status: "done" as const } : e)),
           );
         } catch {
           setLog((prev) =>
@@ -351,7 +353,14 @@ export function VoiceInput({ dispatch }: VoiceInputProps) {
                       </span>
                     </div>
                   )}
-                  {entry.status === "done" && entry.actions.length === 0 && (
+                  {entry.status === "done" && entry.clarifications.length > 0 && (
+                    <div className="mt-1 space-y-0.5">
+                      {entry.clarifications.map((msg, i) => (
+                        <p key={i} className="text-[10px] text-blue-600">💬 {msg}</p>
+                      ))}
+                    </div>
+                  )}
+                  {entry.status === "done" && entry.actions.length === 0 && entry.clarifications.length === 0 && (
                     <p className="mt-0.5 text-[10px] text-amber-600">Inga värden tolkade</p>
                   )}
                   {entry.status === "error" && (
