@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useVoiceInput, type VoiceLang } from "@/hooks/use-voice-input";
 import type { PerioAction, ToothNumber, MeasurementSite, CheckboxField, NumericField } from "@/lib/perio/types";
 import { ALL_TEETH } from "@/lib/perio/constants";
@@ -21,6 +21,66 @@ interface RecordAction {
   furcation?: boolean;
   missing?: boolean;
   comment?: string;
+}
+
+interface ToolCall {
+  id: string;
+  name: string;
+  input: Record<string, unknown>;
+}
+
+interface ConversationTurn {
+  transcript: string;
+  toolCalls: ToolCall[];
+  textResponse: string | null;
+  timestamp: number;
+}
+
+interface TraceEntry {
+  transcript: string;
+  messagesSent: number;
+  messages: MessageParam[];
+  toolCalls: ToolCall[];
+  actionsApplied: number;
+  thinking: string | null;
+  durationMs: number;
+  timestamp: number;
+}
+
+type MessageParam = {
+  role: "user" | "assistant";
+  content: string;
+};
+
+function buildMessages(history: ConversationTurn[], newTranscript: string): MessageParam[] {
+  if (history.length === 0) {
+    return [{ role: "user", content: newTranscript }];
+  }
+
+  // Build a plain text session log so Claude sees the full history clearly
+  const lines: string[] = ["--- Session history ---"];
+  for (let i = 0; i < history.length; i++) {
+    const turn = history[i];
+    lines.push(`\n[Turn ${i + 1}]`);
+    lines.push(`Clinician: ${turn.transcript}`);
+
+    if (turn.toolCalls.length > 0) {
+      const actions = turn.toolCalls
+        .map((tc) => `${tc.name}(${JSON.stringify(tc.input)})`)
+        .join(", ");
+      lines.push(`Actions: ${actions}`);
+    }
+    if (turn.textResponse) {
+      lines.push(`Assistant: ${turn.textResponse}`);
+    }
+    if (turn.toolCalls.length === 0 && !turn.textResponse) {
+      lines.push("Actions: (none)");
+    }
+  }
+  lines.push("\n--- New input ---");
+  lines.push(newTranscript);
+
+  return [{ role: "user", content: lines.join("\n") }];
 }
 
 function toActions(record: RecordAction): PerioAction[] {
@@ -65,11 +125,32 @@ function toActions(record: RecordAction): PerioAction[] {
   return actions;
 }
 
+async function transcribeWithWhisper(audioBlob: Blob, lang: string): Promise<string | null> {
+  try {
+    const formData = new FormData();
+    formData.append("audio", audioBlob, "audio.webm");
+    formData.append("language", lang);
+
+    const res = await fetch("/api/perio/voice/whisper", {
+      method: "POST",
+      body: formData,
+    });
+
+    if (!res.ok) return null;
+    const { transcript } = await res.json() as { transcript: string };
+    return transcript;
+  } catch {
+    return null;
+  }
+}
+
 interface LogEntry {
   id: number;
   transcript: string;
+  whisperTranscript: string | null;
   actions: RecordAction[];
   appliedCount: number;
+  clarifications: string[];
   status: "pending" | "done" | "error";
 }
 
@@ -78,45 +159,123 @@ let logId = 0;
 export function VoiceInput({ dispatch }: VoiceInputProps) {
   const [lang, setLang] = useState<VoiceLang>("sv");
   const [log, setLog] = useState<LogEntry[]>([]);
+  const [conversationHistory, setConversationHistory] = useState<ConversationTurn[]>([]);
+  const conversationHistoryRef = useRef<ConversationTurn[]>([]);
+  const [traces, setTraces] = useState<TraceEntry[]>([]);
+  const pendingRef = useRef<Promise<void>>(Promise.resolve());
+  const prevListeningRef = useRef(false);
+
+  const [showDebug, setShowDebug] = useState(false);
+  useEffect(() => {
+    setShowDebug(new URLSearchParams(window.location.search).has("debug"));
+  }, []);
+
+  // Keep ref in sync
+  useEffect(() => {
+    conversationHistoryRef.current = conversationHistory;
+  }, [conversationHistory]);
 
   const handleCommit = useCallback(
-    async (transcript: string) => {
-      const id = ++logId;
-      setLog((prev) => [...prev, { id, transcript, actions: [], appliedCount: 0, status: "pending" }]);
+    (scribeTranscript: string, audioBlob: Blob | null) => {
+      if (!scribeTranscript.trim()) return;
+      pendingRef.current = pendingRef.current.then(async () => {
+        const id = ++logId;
+        const startTime = performance.now();
+        setLog((prev) => [...prev, { id, transcript: scribeTranscript, whisperTranscript: null, actions: [], appliedCount: 0, clarifications: [], status: "pending" }]);
 
-      try {
-        const res = await fetch("/api/perio/voice", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ transcript }),
-        });
+        try {
+          // Get Whisper transcript (if audio available)
+          const whisperText = audioBlob ? await transcribeWithWhisper(audioBlob, lang) : null;
 
-        if (!res.ok) throw new Error("API error");
-
-        const { actions } = await res.json() as { actions: RecordAction[] };
-
-        let appliedCount = 0;
-        for (const record of actions) {
-          const perioActions = toActions(record);
-          for (const action of perioActions) {
-            dispatch(action);
-            appliedCount++;
+          // Build the transcript to send — combine both when Whisper is available
+          let activeTranscript: string;
+          if (whisperText) {
+            activeTranscript = `[Scribe]: ${scribeTranscript}\n[Whisper]: ${whisperText}`;
+          } else {
+            activeTranscript = scribeTranscript;
           }
-        }
 
-        setLog((prev) =>
-          prev.map((e) => (e.id === id ? { ...e, actions, appliedCount, status: "done" as const } : e)),
-        );
-      } catch {
-        setLog((prev) =>
-          prev.map((e) => (e.id === id ? { ...e, status: "error" as const } : e)),
-        );
-      }
+          const messages = buildMessages(conversationHistoryRef.current, activeTranscript);
+
+          const claudeRes = await fetch("/api/perio/voice", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ messages }),
+          });
+
+          if (!claudeRes.ok) throw new Error("API error");
+
+          const { actions, toolCalls, clarifications = [], textResponse = null, thinking = null } = await claudeRes.json() as {
+            actions: RecordAction[];
+            toolCalls: ToolCall[];
+            clarifications: string[];
+            textResponse: string | null;
+            thinking: string | null;
+          };
+
+          let appliedCount = 0;
+          for (const record of actions) {
+            const perioActions = toActions(record);
+            for (const action of perioActions) {
+              dispatch(action);
+              appliedCount++;
+            }
+          }
+
+          // Append to conversation history (using the transcript that was actually sent)
+          const turn: ConversationTurn = {
+            transcript: activeTranscript,
+            toolCalls: toolCalls ?? [],
+            textResponse,
+            timestamp: Date.now(),
+          };
+          setConversationHistory((prev) => [...prev, turn]);
+
+          const durationMs = Math.round(performance.now() - startTime);
+          const trace: TraceEntry = {
+            transcript: activeTranscript,
+            messagesSent: messages.length,
+            messages,
+            toolCalls: toolCalls ?? [],
+            actionsApplied: appliedCount,
+            thinking,
+            durationMs,
+            timestamp: Date.now(),
+          };
+          setTraces((prev) => [...prev, trace]);
+
+          console.log("[perio-voice-trace]", { ...trace, scribeTranscript, whisperTranscript: whisperText });
+
+          setLog((prev) =>
+            prev.map((e) => (e.id === id ? { ...e, actions, appliedCount, clarifications, whisperTranscript: whisperText, status: "done" as const } : e)),
+          );
+        } catch {
+          setLog((prev) =>
+            prev.map((e) => (e.id === id ? { ...e, status: "error" as const } : e)),
+          );
+        }
+      });
     },
-    [dispatch],
+    [dispatch, lang],
   );
 
   const { isListening, liveTranscript, error, toggle, supported } = useVoiceInput(handleCommit, lang);
+
+  // Reset conversation history when starting a new session
+  useEffect(() => {
+    if (isListening && !prevListeningRef.current) {
+      // false→true transition: new session
+      setConversationHistory([]);
+      conversationHistoryRef.current = [];
+      setLog([]);
+      if (traces.length > 0) {
+        console.log("[perio-voice-trace] session ended", { turns: traces.length, traces });
+      }
+      setTraces([]);
+      pendingRef.current = Promise.resolve();
+    }
+    prevListeningRef.current = isListening;
+  }, [isListening, traces]);
 
   if (!supported) return null;
 
@@ -195,8 +354,13 @@ export function VoiceInput({ dispatch }: VoiceInputProps) {
                 </span>
                 <div className="min-w-0 flex-1">
                   <p className="text-xs text-[var(--brand-ink)]">
-                    &ldquo;{entry.transcript}&rdquo;
+                    <span className="text-[var(--brand-ink-40)] font-medium">Scribe:</span> &ldquo;{entry.transcript}&rdquo;
                   </p>
+                  {entry.whisperTranscript !== null && (
+                    <p className="text-xs text-[var(--brand-ink)]">
+                      <span className="text-[var(--brand-ink-40)] font-medium">Whisper:</span> &ldquo;{entry.whisperTranscript}&rdquo;
+                    </p>
+                  )}
                   {entry.status === "done" && entry.actions.length > 0 && (
                     <div className="mt-1 flex flex-wrap gap-1">
                       {entry.actions.map((a, i) => (
@@ -212,7 +376,14 @@ export function VoiceInput({ dispatch }: VoiceInputProps) {
                       </span>
                     </div>
                   )}
-                  {entry.status === "done" && entry.actions.length === 0 && (
+                  {entry.status === "done" && entry.clarifications.length > 0 && (
+                    <div className="mt-1 space-y-0.5">
+                      {entry.clarifications.map((msg, i) => (
+                        <p key={i} className="text-[10px] text-blue-600">{msg}</p>
+                      ))}
+                    </div>
+                  )}
+                  {entry.status === "done" && entry.actions.length === 0 && entry.clarifications.length === 0 && (
                     <p className="mt-0.5 text-[10px] text-amber-600">Inga värden tolkade</p>
                   )}
                   {entry.status === "error" && (
@@ -221,6 +392,35 @@ export function VoiceInput({ dispatch }: VoiceInputProps) {
                 </div>
               </div>
             </div>
+          ))}
+        </div>
+      )}
+
+      {/* Debug panel */}
+      {showDebug && traces.length > 0 && (
+        <div className="space-y-1">
+          {traces.map((trace, i) => (
+            <details key={trace.timestamp} className="rounded-lg border border-[var(--brand-ink-10)] bg-[var(--brand-card)]">
+              <summary className="cursor-pointer px-3 py-2 text-[10px] font-medium text-[var(--brand-ink-40)]">
+                #{i + 1} &ldquo;{trace.transcript.slice(0, 40)}{trace.transcript.length > 40 ? "..." : ""}&rdquo;
+                <span className="ml-2 text-[var(--brand-ink-20)]">
+                  {trace.toolCalls.length} calls &middot; {trace.durationMs}ms &middot; {trace.messagesSent} msgs
+                </span>
+              </summary>
+              <div className="px-3 py-2 space-y-2">
+                {trace.thinking && (
+                  <details>
+                    <summary className="cursor-pointer text-[10px] font-medium text-purple-500">Thinking</summary>
+                    <pre className="mt-1 max-h-32 overflow-auto whitespace-pre-wrap text-[10px] leading-relaxed text-purple-400">
+                      {trace.thinking}
+                    </pre>
+                  </details>
+                )}
+                <pre className="max-h-48 overflow-auto text-[10px] leading-relaxed text-[var(--brand-ink-60)]">
+                  {JSON.stringify({ ...trace, thinking: undefined }, null, 2)}
+                </pre>
+              </div>
+            </details>
           ))}
         </div>
       )}
