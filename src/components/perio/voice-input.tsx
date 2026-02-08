@@ -39,6 +39,7 @@ interface ConversationTurn {
 interface TraceEntry {
   transcript: string;
   messagesSent: number;
+  messages: MessageParam[];
   toolCalls: ToolCall[];
   actionsApplied: number;
   durationMs: number;
@@ -47,64 +48,38 @@ interface TraceEntry {
 
 type MessageParam = {
   role: "user" | "assistant";
-  content: string | ContentBlock[];
+  content: string;
 };
 
-type ContentBlock =
-  | { type: "text"; text: string }
-  | { type: "tool_use"; id: string; name: string; input: Record<string, unknown> }
-  | { type: "tool_result"; tool_use_id: string; content: string };
-
 function buildMessages(history: ConversationTurn[], newTranscript: string): MessageParam[] {
-  const messages: MessageParam[] = [];
+  if (history.length === 0) {
+    return [{ role: "user", content: newTranscript }];
+  }
 
+  // Build a plain text session log so Claude sees the full history clearly
+  const lines: string[] = ["--- Session history ---"];
   for (let i = 0; i < history.length; i++) {
     const turn = history[i];
-    const nextTranscript = i < history.length - 1 ? history[i + 1].transcript : newTranscript;
-
-    // User message with transcript (first turn stands alone; subsequent are merged into previous assistant response)
-    if (i === 0) {
-      messages.push({ role: "user", content: turn.transcript });
-    }
+    lines.push(`\n[Turn ${i + 1}]`);
+    lines.push(`Clinician: ${turn.transcript}`);
 
     if (turn.toolCalls.length > 0) {
-      // Assistant message: tool_use blocks (+ text if present)
-      const assistantContent: ContentBlock[] = [];
-      if (turn.textResponse) {
-        assistantContent.push({ type: "text" as const, text: turn.textResponse });
-      }
-      for (const tc of turn.toolCalls) {
-        assistantContent.push({
-          type: "tool_use" as const,
-          id: tc.id,
-          name: tc.name,
-          input: tc.input as unknown as Record<string, unknown>,
-        });
-      }
-      messages.push({ role: "assistant", content: assistantContent });
-
-      // User message: tool_results + next transcript merged (avoids consecutive user messages)
-      const userContent: ContentBlock[] = turn.toolCalls.map((tc) => ({
-        type: "tool_result" as const,
-        tool_use_id: tc.id,
-        content: "OK",
-      }));
-      userContent.push({ type: "text" as const, text: nextTranscript });
-      messages.push({ role: "user", content: userContent });
-    } else if (turn.textResponse) {
-      // Text-only response (clarification) — no tool calls
-      messages.push({ role: "assistant", content: turn.textResponse });
-      messages.push({ role: "user", content: nextTranscript });
+      const actions = turn.toolCalls
+        .map((tc) => `${tc.name}(${JSON.stringify(tc.input)})`)
+        .join(", ");
+      lines.push(`Actions: ${actions}`);
     }
-    // else: no response at all (shouldn't happen, but skip gracefully)
+    if (turn.textResponse) {
+      lines.push(`Assistant: ${turn.textResponse}`);
+    }
+    if (turn.toolCalls.length === 0 && !turn.textResponse) {
+      lines.push("Actions: (none)");
+    }
   }
+  lines.push("\n--- New input ---");
+  lines.push(newTranscript);
 
-  // If no history at all, just send the new transcript
-  if (history.length === 0) {
-    messages.push({ role: "user", content: newTranscript });
-  }
-
-  return messages;
+  return [{ role: "user", content: lines.join("\n") }];
 }
 
 function toActions(record: RecordAction): PerioAction[] {
@@ -258,6 +233,7 @@ export function VoiceInput({ dispatch }: VoiceInputProps) {
           const trace: TraceEntry = {
             transcript: activeTranscript,
             messagesSent: messages.length,
+            messages,
             toolCalls: toolCalls ?? [],
             actionsApplied: appliedCount,
             durationMs,
