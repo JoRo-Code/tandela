@@ -60,7 +60,7 @@ export function JawTable({ jaw, examination, dispatch }: JawTableProps) {
                 colSpan={2}
                 className={`
                   p-1 text-center font-mono text-xs font-semibold text-[var(--brand-ink)]
-                  ${i === 8 ? "border-l-2 border-[var(--brand-ink-20)]" : ""}
+                  ${i === 8 ? "border-l-2 border-[var(--brand-ink-20)]" : i > 0 ? "border-l border-[var(--brand-ink-10)]" : ""}
                 `}
               >
                 {t}
@@ -75,7 +75,7 @@ export function JawTable({ jaw, examination, dispatch }: JawTableProps) {
                 key={`${t}-sub`}
                 colSpan={2}
                 className={`
-                  p-0 ${i === 8 ? "border-l-2 border-[var(--brand-ink-20)]" : ""}
+                  p-0 ${i === 8 ? "border-l-2 border-[var(--brand-ink-20)]" : i > 0 ? "border-l border-[var(--brand-ink-10)]" : ""}
                 `}
               >
                 <div className="flex justify-around text-[9px] text-[var(--brand-ink-40)]">
@@ -107,7 +107,7 @@ export function JawTable({ jaw, examination, dispatch }: JawTableProps) {
                     className={`
                       p-0.5 text-center
                       ${isMissing ? "opacity-20 pointer-events-none" : ""}
-                      ${isMidline && siteIdx === 0 ? "border-l-2 border-[var(--brand-ink-20)]" : ""}
+                      ${isMidline && siteIdx === 0 ? "border-l-2 border-[var(--brand-ink-20)]" : !isMidline && siteIdx === 0 && toothIdx > 0 ? "border-l border-[var(--brand-ink-10)]" : ""}
                     `}
                   >
                     <div className="flex items-center justify-center">
