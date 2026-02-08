@@ -13,6 +13,7 @@ export async function POST() {
         input_audio_transcription: {
           model: "gpt-4o-transcribe",
           language: "sv",
+          prompt: "tand, mesialt, distalt, buckalt, lingualt, palatinalt, fickdjup, blödning, plack, furkation, gingival, gingivalrand, recession, mobilitet, implant, bro, krona, saknas",
         },
         turn_detection: {
           type: "server_vad",
