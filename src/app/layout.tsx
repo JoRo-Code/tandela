@@ -20,9 +20,9 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Tandela - AI inbox operations",
+  title: "Tandela - AI for dental clinics",
   description:
-    "Tandela turns inbound email into structured workflows with AI-drafted replies and human control.",
+    "Tandela is your front desk and chairside assistant, always on. Handling patient calls, books appointments, and captures clinical notes — so your team can focus on care, not admin.",
 };
 
 export default function RootLayout({
