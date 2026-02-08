@@ -79,26 +79,22 @@ let logId = 0;
 
 export function VoiceInput({ dispatch }: VoiceInputProps) {
   const [log, setLog] = useState<LogEntry[]>([]);
-  const [processing, setProcessing] = useState(false);
 
-  const handleRecording = useCallback(
-    async (audio: Blob) => {
+  const handleCommit = useCallback(
+    async (transcript: string) => {
       const id = ++logId;
-      setLog((prev) => [...prev, { id, transcript: "", actions: [], appliedCount: 0, status: "pending" }]);
-      setProcessing(true);
+      setLog((prev) => [...prev, { id, transcript, actions: [], appliedCount: 0, status: "pending" }]);
 
       try {
-        const formData = new FormData();
-        formData.append("audio", audio, "recording.webm");
-
         const res = await fetch("/api/perio/voice", {
           method: "POST",
-          body: formData,
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ transcript }),
         });
 
         if (!res.ok) throw new Error("API error");
 
-        const { transcript, actions } = await res.json() as { transcript: string; actions: RecordAction[] };
+        const { actions } = await res.json() as { actions: RecordAction[] };
 
         let appliedCount = 0;
         for (const record of actions) {
@@ -110,20 +106,18 @@ export function VoiceInput({ dispatch }: VoiceInputProps) {
         }
 
         setLog((prev) =>
-          prev.map((e) => (e.id === id ? { ...e, transcript, actions, appliedCount, status: "done" as const } : e)),
+          prev.map((e) => (e.id === id ? { ...e, actions, appliedCount, status: "done" as const } : e)),
         );
       } catch {
         setLog((prev) =>
-          prev.map((e) => (e.id === id ? { ...e, transcript: "Fel vid bearbetning", status: "error" as const } : e)),
+          prev.map((e) => (e.id === id ? { ...e, status: "error" as const } : e)),
         );
-      } finally {
-        setProcessing(false);
       }
     },
     [dispatch],
   );
 
-  const { isListening, toggle, supported } = useVoiceInput(handleRecording);
+  const { isListening, liveTranscript, toggle, supported } = useVoiceInput(handleCommit);
 
   if (!supported) return null;
 
@@ -134,14 +128,11 @@ export function VoiceInput({ dispatch }: VoiceInputProps) {
         <button
           type="button"
           onClick={toggle}
-          disabled={processing}
           className={`
             flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition-all
             ${isListening
               ? "bg-red-500 text-white shadow-lg shadow-red-500/30 animate-pulse"
-              : processing
-                ? "bg-amber-100 text-amber-600 border border-amber-200 cursor-wait"
-                : "bg-[var(--brand-cream)] text-[var(--brand-ink)] border border-[var(--brand-ink-10)] hover:bg-[var(--brand-ink-5)]"
+              : "bg-[var(--brand-cream)] text-[var(--brand-ink)] border border-[var(--brand-ink-10)] hover:bg-[var(--brand-ink-5)]"
             }
           `}
           aria-label={isListening ? "Stoppa inspelning" : "Starta röstinmatning"}
@@ -161,17 +152,14 @@ export function VoiceInput({ dispatch }: VoiceInputProps) {
 
         {isListening && (
           <div className="min-w-0 flex-1 rounded-lg bg-red-50 border border-red-200 px-3 py-2">
-            <p className="text-xs font-medium text-red-600">Spelar in... tryck igen för att stoppa</p>
+            <p className="text-xs font-medium text-red-600">Lyssnar...</p>
+            {liveTranscript && (
+              <p className="mt-0.5 text-sm text-[var(--brand-ink)]">{liveTranscript}</p>
+            )}
           </div>
         )}
 
-        {processing && (
-          <div className="min-w-0 flex-1 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2">
-            <p className="text-xs font-medium text-amber-600">Transkriberar och tolkar...</p>
-          </div>
-        )}
-
-        {!isListening && !processing && log.length === 0 && (
+        {!isListening && log.length === 0 && (
           <p className="text-xs text-[var(--brand-ink-40)]">Tryck för att börja diktera</p>
         )}
       </div>
@@ -192,14 +180,9 @@ export function VoiceInput({ dispatch }: VoiceInputProps) {
                   )}
                 </span>
                 <div className="min-w-0 flex-1">
-                  {entry.transcript && (
-                    <p className="text-xs text-[var(--brand-ink)]">
-                      &ldquo;{entry.transcript}&rdquo;
-                    </p>
-                  )}
-                  {entry.status === "pending" && !entry.transcript && (
-                    <p className="text-xs text-[var(--brand-ink-40)]">Bearbetar ljud...</p>
-                  )}
+                  <p className="text-xs text-[var(--brand-ink)]">
+                    &ldquo;{entry.transcript}&rdquo;
+                  </p>
                   {entry.status === "done" && entry.actions.length > 0 && (
                     <div className="mt-1 flex flex-wrap gap-1">
                       {entry.actions.map((a, i) => (
