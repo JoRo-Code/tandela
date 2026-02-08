@@ -42,6 +42,7 @@ interface TraceEntry {
   messages: MessageParam[];
   toolCalls: ToolCall[];
   actionsApplied: number;
+  thinking: string | null;
   durationMs: number;
   timestamp: number;
 }
@@ -166,7 +167,7 @@ export function VoiceInput({ dispatch }: VoiceInputProps) {
 
   const [showDebug, setShowDebug] = useState(false);
   useEffect(() => {
-    setShowDebug(process.env.NODE_ENV === "development" || new URLSearchParams(window.location.search).has("debug"));
+    setShowDebug(new URLSearchParams(window.location.search).has("debug"));
   }, []);
 
   // Keep ref in sync
@@ -204,11 +205,12 @@ export function VoiceInput({ dispatch }: VoiceInputProps) {
 
           if (!claudeRes.ok) throw new Error("API error");
 
-          const { actions, toolCalls, clarifications = [], textResponse = null } = await claudeRes.json() as {
+          const { actions, toolCalls, clarifications = [], textResponse = null, thinking = null } = await claudeRes.json() as {
             actions: RecordAction[];
             toolCalls: ToolCall[];
             clarifications: string[];
             textResponse: string | null;
+            thinking: string | null;
           };
 
           let appliedCount = 0;
@@ -236,6 +238,7 @@ export function VoiceInput({ dispatch }: VoiceInputProps) {
             messages,
             toolCalls: toolCalls ?? [],
             actionsApplied: appliedCount,
+            thinking,
             durationMs,
             timestamp: Date.now(),
           };
@@ -404,9 +407,19 @@ export function VoiceInput({ dispatch }: VoiceInputProps) {
                   {trace.toolCalls.length} calls &middot; {trace.durationMs}ms &middot; {trace.messagesSent} msgs
                 </span>
               </summary>
-              <pre className="max-h-48 overflow-auto px-3 py-2 text-[10px] leading-relaxed text-[var(--brand-ink-60)]">
-                {JSON.stringify(trace, null, 2)}
-              </pre>
+              <div className="px-3 py-2 space-y-2">
+                {trace.thinking && (
+                  <details>
+                    <summary className="cursor-pointer text-[10px] font-medium text-purple-500">Thinking</summary>
+                    <pre className="mt-1 max-h-32 overflow-auto whitespace-pre-wrap text-[10px] leading-relaxed text-purple-400">
+                      {trace.thinking}
+                    </pre>
+                  </details>
+                )}
+                <pre className="max-h-48 overflow-auto text-[10px] leading-relaxed text-[var(--brand-ink-60)]">
+                  {JSON.stringify({ ...trace, thinking: undefined }, null, 2)}
+                </pre>
+              </div>
             </details>
           ))}
         </div>

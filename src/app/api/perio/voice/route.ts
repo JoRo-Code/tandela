@@ -144,10 +144,11 @@ export async function POST(request: NextRequest) {
 
     const response = await anthropic.messages.create({
       model: "claude-opus-4-6",
-      max_tokens: 1024,
+      max_tokens: 8024,
       system: SYSTEM_PROMPT,
       tools: [TOOL_DEFINITION, CLARIFY_TOOL],
       tool_choice: { type: "auto" },
+      thinking: { type: "enabled", budget_tokens: 5000 },
       messages,
     });
 
@@ -158,20 +159,27 @@ export async function POST(request: NextRequest) {
     const toolCalls = allToolCalls.filter((tc) => tc.name === "record");
     const actions = toolCalls.map((tc) => tc.input);
 
-    // Collect text from both clarify tool calls and plain text responses
-    const textParts = [
-      ...allToolCalls
-        .filter((tc) => tc.name === "clarify")
-        .map((tc) => (tc.input as { message: string }).message),
-      ...response.content
-        .filter((block): block is Anthropic.TextBlock => block.type === "text")
-        .map((block) => block.text)
-        .filter((text) => text.trim().length > 0),
-    ];
-    const clarifications = textParts;
-    const textResponse = textParts.length > 0 ? textParts.join("\n") : null;
+    // Separate thinking (internal reasoning) from user-facing text
+    const thinking = response.content
+      .filter((block): block is Anthropic.ThinkingBlock => block.type === "thinking")
+      .map((block) => block.thinking)
+      .join("\n");
 
-    return NextResponse.json({ actions, toolCalls: allToolCalls, clarifications, textResponse });
+    // Only explicit clarify tool calls are user-facing
+    const clarifications = allToolCalls
+      .filter((tc) => tc.name === "clarify")
+      .map((tc) => (tc.input as { message: string }).message);
+
+    // Plain text blocks go into textResponse for conversation history but not shown as clarifications
+    const plainText = response.content
+      .filter((block): block is Anthropic.TextBlock => block.type === "text")
+      .map((block) => block.text)
+      .filter((text) => text.trim().length > 0);
+
+    const allText = [...clarifications, ...plainText];
+    const textResponse = allText.length > 0 ? allText.join("\n") : null;
+
+    return NextResponse.json({ actions, toolCalls: allToolCalls, clarifications, textResponse, thinking });
   } catch (error) {
     console.error("Perio voice error:", error);
     return NextResponse.json(
