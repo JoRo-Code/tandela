@@ -128,7 +128,6 @@ function toActions(record: RecordAction): PerioAction[] {
 interface LogEntry {
   id: number;
   transcript: string;
-  openaiTranscript: string | null;
   actions: RecordAction[];
   appliedCount: number;
   clarifications: string[];
@@ -157,23 +156,23 @@ export function VoiceInput({ dispatch }: VoiceInputProps) {
   }, [conversationHistory]);
 
   const handleCommit = useCallback(
-    (scribeTranscript: string, openaiText: string | null) => {
-      if (!scribeTranscript.trim()) return;
+    (transcript: string, secondaryTranscript: string | null) => {
+      if (!transcript.trim()) return;
       pendingRef.current = pendingRef.current.then(async () => {
         const id = ++logId;
         const startTime = performance.now();
-        setLog((prev) => [...prev, { id, transcript: scribeTranscript, openaiTranscript: openaiText, actions: [], appliedCount: 0, clarifications: [], status: "pending" }]);
+        setLog((prev) => [...prev, { id, transcript, actions: [], appliedCount: 0, clarifications: [], status: "pending" }]);
 
         try {
-          // Build the transcript to send — combine both when OpenAI is available
-          let activeTranscript: string;
-          if (openaiText) {
-            activeTranscript = `[Scribe]: ${scribeTranscript}\n[OpenAI]: ${openaiText}`;
+          // Send both transcripts to Claude so it can compare and detect ambiguity
+          let claudeTranscript: string;
+          if (secondaryTranscript) {
+            claudeTranscript = `[Transcript 1]: ${transcript}\n[Transcript 2]: ${secondaryTranscript}`;
           } else {
-            activeTranscript = scribeTranscript;
+            claudeTranscript = transcript;
           }
 
-          const messages = buildMessages(conversationHistoryRef.current, activeTranscript);
+          const messages = buildMessages(conversationHistoryRef.current, claudeTranscript);
 
           const claudeRes = await fetch("/api/perio/voice", {
             method: "POST",
@@ -200,9 +199,8 @@ export function VoiceInput({ dispatch }: VoiceInputProps) {
             }
           }
 
-          // Append to conversation history (using the transcript that was actually sent)
           const turn: ConversationTurn = {
-            transcript: activeTranscript,
+            transcript: claudeTranscript,
             toolCalls: toolCalls ?? [],
             textResponse,
             timestamp: Date.now(),
@@ -211,7 +209,7 @@ export function VoiceInput({ dispatch }: VoiceInputProps) {
 
           const durationMs = Math.round(performance.now() - startTime);
           const trace: TraceEntry = {
-            transcript: activeTranscript,
+            transcript: claudeTranscript,
             messagesSent: messages.length,
             messages,
             toolCalls: toolCalls ?? [],
@@ -222,10 +220,10 @@ export function VoiceInput({ dispatch }: VoiceInputProps) {
           };
           setTraces((prev) => [...prev, trace]);
 
-          console.log("[perio-voice-trace]", { ...trace, scribeTranscript, openaiTranscript: openaiText });
+          console.log("[perio-voice-trace]", trace);
 
           setLog((prev) =>
-            prev.map((e) => (e.id === id ? { ...e, actions, appliedCount, clarifications, openaiTranscript: openaiText, status: "done" as const } : e)),
+            prev.map((e) => (e.id === id ? { ...e, actions, appliedCount, clarifications, status: "done" as const } : e)),
           );
         } catch {
           setLog((prev) =>
@@ -332,13 +330,8 @@ export function VoiceInput({ dispatch }: VoiceInputProps) {
                 </span>
                 <div className="min-w-0 flex-1">
                   <p className="text-xs text-[var(--brand-ink)]">
-                    <span className="text-[var(--brand-ink-40)] font-medium">Scribe:</span> &ldquo;{entry.transcript}&rdquo;
+                    &ldquo;{entry.transcript}&rdquo;
                   </p>
-                  {entry.openaiTranscript !== null && (
-                    <p className="text-xs text-[var(--brand-ink)]">
-                      <span className="text-[var(--brand-ink-40)] font-medium">OpenAI:</span> &ldquo;{entry.openaiTranscript}&rdquo;
-                    </p>
-                  )}
                   {entry.status === "done" && entry.actions.length > 0 && (
                     <div className="mt-1 flex flex-wrap gap-1">
                       {entry.actions.map((a, i) => (

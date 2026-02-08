@@ -2,17 +2,21 @@
 
 import { useState, useCallback, useRef } from "react";
 
-interface UseOpenAITranscribeReturn {
+interface UseRealtimeTranscribeOptions {
+  onTranscript?: (text: string) => void;
+}
+
+interface UseRealtimeTranscribeReturn {
   connect: () => Promise<void>;
   disconnect: () => void;
-  commitBuffer: () => void;
   isConnected: boolean;
   lastTranscript: string | null;
-  lastTranscriptRef: React.RefObject<string | null>;
   error: string | null;
 }
 
-export function useOpenAITranscribe(): UseOpenAITranscribeReturn {
+export function useRealtimeTranscribe(
+  options: UseRealtimeTranscribeOptions = {},
+): UseRealtimeTranscribeReturn {
   const [isConnected, setIsConnected] = useState(false);
   const [lastTranscript, setLastTranscript] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -21,13 +25,8 @@ export function useOpenAITranscribe(): UseOpenAITranscribeReturn {
   const audioContextRef = useRef<AudioContext | null>(null);
   const workletNodeRef = useRef<AudioWorkletNode | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
-  const lastTranscriptRef = useRef<string | null>(null);
-
-  // Keep ref in sync for synchronous access
-  const updateLastTranscript = useCallback((text: string | null) => {
-    lastTranscriptRef.current = text;
-    setLastTranscript(text);
-  }, []);
+  const onTranscriptRef = useRef(options.onTranscript);
+  onTranscriptRef.current = options.onTranscript;
 
   const disconnect = useCallback(() => {
     if (workletNodeRef.current) {
@@ -51,7 +50,7 @@ export function useOpenAITranscribe(): UseOpenAITranscribeReturn {
 
   const connect = useCallback(async () => {
     setError(null);
-    updateLastTranscript(null);
+    setLastTranscript(null);
 
     // 1. Get ephemeral token
     const tokenRes = await fetch("/api/perio/voice/openai-token", { method: "POST" });
@@ -93,7 +92,11 @@ export function useOpenAITranscribe(): UseOpenAITranscribeReturn {
         const msg = JSON.parse(event.data as string);
 
         if (msg.type === "conversation.item.input_audio_transcription.completed") {
-          updateLastTranscript(msg.transcript ?? null);
+          const text = msg.transcript as string | undefined;
+          if (text) {
+            setLastTranscript(text);
+            onTranscriptRef.current?.(text);
+          }
         } else if (msg.type === "error") {
           console.error("[openai-realtime] error event:", msg.error);
           setError(msg.error?.message ?? "OpenAI Realtime error");
@@ -112,7 +115,7 @@ export function useOpenAITranscribe(): UseOpenAITranscribeReturn {
       disconnect();
     };
 
-    // 5. Set up AudioWorklet pipeline for PCM16 streaming
+    // 4. Set up AudioWorklet pipeline for PCM16 streaming
     const stream = await navigator.mediaDevices.getUserMedia({
       audio: { echoCancellation: true, noiseSuppression: true },
     });
@@ -149,21 +152,13 @@ export function useOpenAITranscribe(): UseOpenAITranscribeReturn {
     source.connect(workletNode);
     workletNode.connect(audioContext.destination); // required for worklet to process
     setIsConnected(true);
-  }, [disconnect, updateLastTranscript]);
-
-  const commitBuffer = useCallback(() => {
-    if (wsRef.current?.readyState === WebSocket.OPEN) {
-      wsRef.current.send(JSON.stringify({ type: "input_audio_buffer.commit" }));
-    }
-  }, []);
+  }, [disconnect]);
 
   return {
     connect,
     disconnect,
-    commitBuffer,
     isConnected,
     lastTranscript,
-    lastTranscriptRef,
     error,
   };
 }

@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect, useRef } from "react";
 import { useScribe } from "@elevenlabs/react";
-import { useOpenAITranscribe } from "@/hooks/use-openai-transcribe";
+import { useRealtimeTranscribe } from "@/hooks/use-realtime-transcribe";
 
 export type VoiceLang = "sv" | "en";
 
@@ -17,7 +17,7 @@ interface UseVoiceInputReturn {
 }
 
 export function useVoiceInput(
-  onCommit: (scribeText: string, openaiText: string | null) => void,
+  onCommit: (transcript: string, secondaryTranscript: string | null) => void,
   lang: VoiceLang = "sv",
 ): UseVoiceInputReturn {
   const [supported, setSupported] = useState(false);
@@ -25,27 +25,39 @@ export function useVoiceInput(
   const onCommitRef = useRef(onCommit);
   onCommitRef.current = onCommit;
 
-  const openai = useOpenAITranscribe();
+  // Buffer of Scribe commits since the last primary commit — flushed when OpenAI fires
+  const scribeBufferRef = useRef<string[]>([]);
+
+  // Primary transcription — OpenAI Realtime drives commits
+  const openai = useRealtimeTranscribe({
+    onTranscript: (text) => {
+      const secondary = scribeBufferRef.current.length > 0
+        ? scribeBufferRef.current.join(" ")
+        : null;
+      scribeBufferRef.current = [];
+      onCommitRef.current(text, secondary);
+    },
+  });
 
   useEffect(() => {
     setSupported(typeof navigator !== "undefined" && !!navigator.mediaDevices?.getUserMedia);
   }, []);
 
+  // Scribe provides live partial preview + secondary transcript for Claude
   const scribe = useScribe({
     modelId: "scribe_v2_realtime",
     languageCode: lang,
     commitStrategy: "vad" as never,
     vadSilenceThresholdSecs: 1.5,
     onCommittedTranscript: (transcript) => {
-      // Grab the latest OpenAI transcript synchronously via ref
-      const openaiText = openai.lastTranscriptRef.current;
-      onCommitRef.current(transcript.text, openaiText);
+      scribeBufferRef.current.push(transcript.text);
     },
   });
 
   const isListening = scribe.isConnected || scribe.status === "connecting";
 
-  const liveTranscript = scribe.partialTranscript ?? "";
+  // Bubble: show OpenAI transcript when available, Scribe partial while speaking
+  const liveTranscript = openai.lastTranscript || scribe.partialTranscript || "";
 
   const error = tokenError ?? scribe.error ?? openai.error ?? null;
 
@@ -71,7 +83,6 @@ export function useVoiceInput(
 
       // Workaround: SDK bug where AudioWorklet fires port.onmessage after
       // disconnect, calling connection.send() which throws synchronously.
-      // Patch send() to silently ignore when the WebSocket is already closed.
       const conn = scribe.getConnection();
       if (conn) {
         const originalSend = conn.send.bind(conn);
