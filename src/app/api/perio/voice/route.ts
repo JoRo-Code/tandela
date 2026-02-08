@@ -158,8 +158,8 @@ export async function POST(request: NextRequest) {
     const toolCalls = allToolCalls.filter((tc) => tc.name === "record");
     const actions = toolCalls.map((tc) => tc.input);
 
-    // Collect clarifications from both clarify tool calls and plain text responses
-    const clarifications = [
+    // Collect text from both clarify tool calls and plain text responses
+    const textParts = [
       ...allToolCalls
         .filter((tc) => tc.name === "clarify")
         .map((tc) => (tc.input as { message: string }).message),
@@ -168,8 +168,10 @@ export async function POST(request: NextRequest) {
         .map((block) => block.text)
         .filter((text) => text.trim().length > 0),
     ];
+    const clarifications = textParts;
+    const textResponse = textParts.length > 0 ? textParts.join("\n") : null;
 
-    return NextResponse.json({ actions, toolCalls: allToolCalls, clarifications });
+    return NextResponse.json({ actions, toolCalls: allToolCalls, clarifications, textResponse });
   } catch (error) {
     console.error("Perio voice error:", error);
     return NextResponse.json(

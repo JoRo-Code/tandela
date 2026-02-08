@@ -32,6 +32,7 @@ interface ToolCall {
 interface ConversationTurn {
   transcript: string;
   toolCalls: ToolCall[];
+  textResponse: string | null;
   timestamp: number;
 }
 
@@ -59,38 +60,43 @@ function buildMessages(history: ConversationTurn[], newTranscript: string): Mess
 
   for (let i = 0; i < history.length; i++) {
     const turn = history[i];
+    const nextTranscript = i < history.length - 1 ? history[i + 1].transcript : newTranscript;
 
-    // User message with transcript (first turn or merged with previous tool_result)
+    // User message with transcript (first turn stands alone; subsequent are merged into previous assistant response)
     if (i === 0) {
       messages.push({ role: "user", content: turn.transcript });
     }
-    // else: transcript was already merged into the previous user message
 
-    // Assistant message with tool_use blocks
     if (turn.toolCalls.length > 0) {
-      messages.push({
-        role: "assistant",
-        content: turn.toolCalls.map((tc) => ({
+      // Assistant message: tool_use blocks (+ text if present)
+      const assistantContent: ContentBlock[] = [];
+      if (turn.textResponse) {
+        assistantContent.push({ type: "text" as const, text: turn.textResponse });
+      }
+      for (const tc of turn.toolCalls) {
+        assistantContent.push({
           type: "tool_use" as const,
           id: tc.id,
           name: tc.name,
           input: tc.input as unknown as Record<string, unknown>,
-        })),
-      });
+        });
+      }
+      messages.push({ role: "assistant", content: assistantContent });
 
-      // User message: tool_results + next transcript merged together
-      const toolResults: ContentBlock[] = turn.toolCalls.map((tc) => ({
+      // User message: tool_results + next transcript merged (avoids consecutive user messages)
+      const userContent: ContentBlock[] = turn.toolCalls.map((tc) => ({
         type: "tool_result" as const,
         tool_use_id: tc.id,
         content: "OK",
       }));
-
-      const nextTranscript = i < history.length - 1 ? history[i + 1].transcript : newTranscript;
-      messages.push({
-        role: "user",
-        content: [...toolResults, { type: "text" as const, text: nextTranscript }],
-      });
+      userContent.push({ type: "text" as const, text: nextTranscript });
+      messages.push({ role: "user", content: userContent });
+    } else if (turn.textResponse) {
+      // Text-only response (clarification) — no tool calls
+      messages.push({ role: "assistant", content: turn.textResponse });
+      messages.push({ role: "user", content: nextTranscript });
     }
+    // else: no response at all (shouldn't happen, but skip gracefully)
   }
 
   // If no history at all, just send the new transcript
@@ -223,10 +229,11 @@ export function VoiceInput({ dispatch }: VoiceInputProps) {
 
           if (!claudeRes.ok) throw new Error("API error");
 
-          const { actions, toolCalls, clarifications = [] } = await claudeRes.json() as {
+          const { actions, toolCalls, clarifications = [], textResponse = null } = await claudeRes.json() as {
             actions: RecordAction[];
             toolCalls: ToolCall[];
             clarifications: string[];
+            textResponse: string | null;
           };
 
           let appliedCount = 0;
@@ -242,6 +249,7 @@ export function VoiceInput({ dispatch }: VoiceInputProps) {
           const turn: ConversationTurn = {
             transcript: activeTranscript,
             toolCalls: toolCalls ?? [],
+            textResponse,
             timestamp: Date.now(),
           };
           setConversationHistory((prev) => [...prev, turn]);
