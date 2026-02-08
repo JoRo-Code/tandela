@@ -101,7 +101,7 @@ export async function POST(request: NextRequest) {
       max_tokens: 1024,
       system: SYSTEM_PROMPT,
       tools: [TOOL_DEFINITION],
-      tool_choice: { type: "any" },
+      tool_choice: { type: "auto" },
       messages,
     });
 

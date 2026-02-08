@@ -174,6 +174,7 @@ export function VoiceInput({ dispatch }: VoiceInputProps) {
 
   const handleCommit = useCallback(
     (transcript: string) => {
+      if (!transcript.trim()) return;
       pendingRef.current = pendingRef.current.then(async () => {
         const id = ++logId;
         const startTime = performance.now();
