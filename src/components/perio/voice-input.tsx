@@ -143,9 +143,29 @@ function toActions(record: RecordAction): PerioAction[] {
   return actions;
 }
 
+async function transcribeWithWhisper(audioBlob: Blob, lang: string): Promise<string | null> {
+  try {
+    const formData = new FormData();
+    formData.append("audio", audioBlob, "audio.webm");
+    formData.append("language", lang);
+
+    const res = await fetch("/api/perio/voice/whisper", {
+      method: "POST",
+      body: formData,
+    });
+
+    if (!res.ok) return null;
+    const { transcript } = await res.json() as { transcript: string };
+    return transcript;
+  } catch {
+    return null;
+  }
+}
+
 interface LogEntry {
   id: number;
   transcript: string;
+  whisperTranscript: string | null;
   actions: RecordAction[];
   appliedCount: number;
   clarifications: string[];
@@ -174,25 +194,29 @@ export function VoiceInput({ dispatch }: VoiceInputProps) {
   }, [conversationHistory]);
 
   const handleCommit = useCallback(
-    (transcript: string) => {
+    (transcript: string, audioBlob: Blob | null) => {
       if (!transcript.trim()) return;
       pendingRef.current = pendingRef.current.then(async () => {
         const id = ++logId;
         const startTime = performance.now();
-        setLog((prev) => [...prev, { id, transcript, actions: [], appliedCount: 0, clarifications: [], status: "pending" }]);
+        setLog((prev) => [...prev, { id, transcript, whisperTranscript: null, actions: [], appliedCount: 0, clarifications: [], status: "pending" }]);
 
         try {
           const messages = buildMessages(conversationHistoryRef.current, transcript);
 
-          const res = await fetch("/api/perio/voice", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ messages }),
-          });
+          // Run Claude + Whisper in parallel
+          const [claudeRes, whisperText] = await Promise.all([
+            fetch("/api/perio/voice", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ messages }),
+            }),
+            audioBlob ? transcribeWithWhisper(audioBlob, lang) : Promise.resolve(null),
+          ]);
 
-          if (!res.ok) throw new Error("API error");
+          if (!claudeRes.ok) throw new Error("API error");
 
-          const { actions, toolCalls, clarifications = [] } = await res.json() as {
+          const { actions, toolCalls, clarifications = [] } = await claudeRes.json() as {
             actions: RecordAction[];
             toolCalls: ToolCall[];
             clarifications: string[];
@@ -226,10 +250,10 @@ export function VoiceInput({ dispatch }: VoiceInputProps) {
           };
           setTraces((prev) => [...prev, trace]);
 
-          console.log("[perio-voice-trace]", trace);
+          console.log("[perio-voice-trace]", { ...trace, whisperTranscript: whisperText });
 
           setLog((prev) =>
-            prev.map((e) => (e.id === id ? { ...e, actions, appliedCount, clarifications, status: "done" as const } : e)),
+            prev.map((e) => (e.id === id ? { ...e, actions, appliedCount, clarifications, whisperTranscript: whisperText, status: "done" as const } : e)),
           );
         } catch {
           setLog((prev) =>
@@ -238,7 +262,7 @@ export function VoiceInput({ dispatch }: VoiceInputProps) {
         }
       });
     },
-    [dispatch],
+    [dispatch, lang],
   );
 
   const { isListening, liveTranscript, error, toggle, supported } = useVoiceInput(handleCommit, lang);
@@ -336,8 +360,13 @@ export function VoiceInput({ dispatch }: VoiceInputProps) {
                 </span>
                 <div className="min-w-0 flex-1">
                   <p className="text-xs text-[var(--brand-ink)]">
-                    &ldquo;{entry.transcript}&rdquo;
+                    <span className="text-[var(--brand-ink-40)] font-medium">Scribe:</span> &ldquo;{entry.transcript}&rdquo;
                   </p>
+                  {entry.whisperTranscript !== null && (
+                    <p className="text-xs text-[var(--brand-ink-60)]">
+                      <span className="text-[var(--brand-ink-40)] font-medium">Whisper:</span> &ldquo;{entry.whisperTranscript}&rdquo;
+                    </p>
+                  )}
                   {entry.status === "done" && entry.actions.length > 0 && (
                     <div className="mt-1 flex flex-wrap gap-1">
                       {entry.actions.map((a, i) => (
@@ -356,7 +385,7 @@ export function VoiceInput({ dispatch }: VoiceInputProps) {
                   {entry.status === "done" && entry.clarifications.length > 0 && (
                     <div className="mt-1 space-y-0.5">
                       {entry.clarifications.map((msg, i) => (
-                        <p key={i} className="text-[10px] text-blue-600">💬 {msg}</p>
+                        <p key={i} className="text-[10px] text-blue-600">{msg}</p>
                       ))}
                     </div>
                   )}
