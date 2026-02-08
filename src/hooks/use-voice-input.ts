@@ -20,7 +20,7 @@ export function useVoiceInput(onCommit: (transcript: string) => void): UseVoiceI
 
   const wsRef = useRef<WebSocket | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
-  const processorRef = useRef<ScriptProcessorNode | null>(null);
+  const workletRef = useRef<AudioWorkletNode | null>(null);
   const contextRef = useRef<AudioContext | null>(null);
   const committedTextRef = useRef("");
 
@@ -29,8 +29,8 @@ export function useVoiceInput(onCommit: (transcript: string) => void): UseVoiceI
   }, []);
 
   const cleanup = useCallback(() => {
-    processorRef.current?.disconnect();
-    processorRef.current = null;
+    workletRef.current?.disconnect();
+    workletRef.current = null;
     contextRef.current?.close();
     contextRef.current = null;
     streamRef.current?.getTracks().forEach((t) => t.stop());
@@ -97,25 +97,20 @@ export function useVoiceInput(onCommit: (transcript: string) => void): UseVoiceI
         setIsListening(false);
       };
 
-      // 4. Stream mic audio as PCM to WebSocket
+      // 4. Stream mic audio as PCM to WebSocket via AudioWorklet
       const audioContext = new AudioContext({ sampleRate: 16000 });
       contextRef.current = audioContext;
 
-      const source = audioContext.createMediaStreamSource(stream);
-      const processor = audioContext.createScriptProcessor(4096, 1, 1);
-      processorRef.current = processor;
+      await audioContext.audioWorklet.addModule("/pcm-processor.js");
 
-      processor.onaudioprocess = (e) => {
+      const source = audioContext.createMediaStreamSource(stream);
+      const worklet = new AudioWorkletNode(audioContext, "pcm-processor");
+      workletRef.current = worklet;
+
+      worklet.port.onmessage = (e) => {
         if (ws.readyState !== WebSocket.OPEN) return;
 
-        const float32 = e.inputBuffer.getChannelData(0);
-        const int16 = new Int16Array(float32.length);
-        for (let i = 0; i < float32.length; i++) {
-          const s = Math.max(-1, Math.min(1, float32[i]));
-          int16[i] = s < 0 ? s * 0x8000 : s * 0x7fff;
-        }
-
-        const bytes = new Uint8Array(int16.buffer);
+        const bytes = new Uint8Array(e.data as ArrayBuffer);
         let binary = "";
         for (let i = 0; i < bytes.length; i++) {
           binary += String.fromCharCode(bytes[i]);
@@ -127,8 +122,8 @@ export function useVoiceInput(onCommit: (transcript: string) => void): UseVoiceI
         }));
       };
 
-      source.connect(processor);
-      processor.connect(audioContext.destination);
+      source.connect(worklet);
+      worklet.connect(audioContext.destination);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Okänt fel";
       console.error("Voice input error:", msg);
