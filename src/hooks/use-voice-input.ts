@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useEffect, useRef } from "react";
 import { useScribe } from "@elevenlabs/react";
+import { useOpenAITranscribe } from "@/hooks/use-openai-transcribe";
 
 export type VoiceLang = "sv" | "en";
 
@@ -16,7 +17,7 @@ interface UseVoiceInputReturn {
 }
 
 export function useVoiceInput(
-  onCommit: (transcript: string, audioBlob: Blob | null) => void,
+  onCommit: (scribeText: string, openaiText: string | null) => void,
   lang: VoiceLang = "sv",
 ): UseVoiceInputReturn {
   const [supported, setSupported] = useState(false);
@@ -24,51 +25,11 @@ export function useVoiceInput(
   const onCommitRef = useRef(onCommit);
   onCommitRef.current = onCommit;
 
-  // MediaRecorder state for capturing audio chunks
-  const mediaStreamRef = useRef<MediaStream | null>(null);
-  const recorderRef = useRef<MediaRecorder | null>(null);
-  const audioChunksRef = useRef<Blob[]>([]);
+  const openai = useOpenAITranscribe();
 
   useEffect(() => {
     setSupported(typeof navigator !== "undefined" && !!navigator.mediaDevices?.getUserMedia);
   }, []);
-
-  /** Stop current recorder segment, return the audio blob, and start a new segment */
-  const flushRecorder = useCallback((): Promise<Blob | null> => {
-    const recorder = recorderRef.current;
-    if (!recorder || recorder.state !== "recording") {
-      return Promise.resolve(null);
-    }
-
-    return new Promise<Blob | null>((resolve) => {
-      recorder.ondataavailable = (e) => {
-        if (e.data.size > 0) {
-          audioChunksRef.current.push(e.data);
-        }
-        const blob = new Blob(audioChunksRef.current, { type: recorder.mimeType });
-        audioChunksRef.current = [];
-        resolve(blob);
-      };
-      recorder.onstop = () => {
-        // Start a new recorder for the next segment
-        if (mediaStreamRef.current && mediaStreamRef.current.active) {
-          startNewRecorder(mediaStreamRef.current);
-        }
-      };
-      recorder.stop();
-    });
-  }, []);
-
-  const startNewRecorder = (stream: MediaStream) => {
-    const recorder = new MediaRecorder(stream);
-    recorder.ondataavailable = (e) => {
-      if (e.data.size > 0) {
-        audioChunksRef.current.push(e.data);
-      }
-    };
-    recorder.start();
-    recorderRef.current = recorder;
-  };
 
   const scribe = useScribe({
     modelId: "scribe_v2_realtime",
@@ -76,9 +37,9 @@ export function useVoiceInput(
     commitStrategy: "vad" as never,
     vadSilenceThresholdSecs: 1.5,
     onCommittedTranscript: (transcript) => {
-      flushRecorder().then((blob) => {
-        onCommitRef.current(transcript.text, blob);
-      });
+      // Grab the latest OpenAI transcript synchronously via ref
+      const openaiText = openai.lastTranscriptRef.current;
+      onCommitRef.current(transcript.text, openaiText);
     },
   });
 
@@ -87,7 +48,7 @@ export function useVoiceInput(
   const committedText = scribe.committedTranscripts.map((t) => t.text).join(" ");
   const liveTranscript = [committedText, scribe.partialTranscript].filter(Boolean).join(" ");
 
-  const error = tokenError ?? scribe.error ?? null;
+  const error = tokenError ?? scribe.error ?? openai.error ?? null;
 
   const start = useCallback(async () => {
     if (!supported) return;
@@ -124,40 +85,24 @@ export function useVoiceInput(
         };
       }
 
-      // Start parallel audio recording for Whisper comparison
+      // Start OpenAI Realtime transcription in parallel
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          audio: { echoCancellation: true, noiseSuppression: true },
-        });
-        mediaStreamRef.current = stream;
-        audioChunksRef.current = [];
-        startNewRecorder(stream);
+        await openai.connect();
       } catch {
-        // Non-fatal: Whisper comparison just won't work
-        console.warn("[perio-voice] Could not start MediaRecorder for Whisper comparison");
+        console.warn("[perio-voice] Could not start OpenAI Realtime transcription");
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Okänt fel";
       setTokenError(msg);
       setTimeout(() => setTokenError(null), 3000);
     }
-  }, [supported, scribe]);
+  }, [supported, scribe, openai]);
 
   const stop = useCallback(() => {
     scribe.disconnect();
+    openai.disconnect();
     setTokenError(null);
-
-    // Stop MediaRecorder and release stream
-    if (recorderRef.current && recorderRef.current.state !== "inactive") {
-      recorderRef.current.stop();
-    }
-    recorderRef.current = null;
-    audioChunksRef.current = [];
-    if (mediaStreamRef.current) {
-      mediaStreamRef.current.getTracks().forEach((t) => t.stop());
-      mediaStreamRef.current = null;
-    }
-  }, [scribe]);
+  }, [scribe, openai]);
 
   const isListeningRef = useRef(false);
   isListeningRef.current = isListening;
