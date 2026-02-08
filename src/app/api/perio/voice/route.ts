@@ -122,11 +122,7 @@ Common Swedish dental speech patterns:
 - "marg gingiva minus 2" or "recession 2" → gingivalMargin=-2
 - "distal 5 mesial 3" → two calls: site="D" pocketDepth=5, site="M" pocketDepth=3
 
-Common transcription errors to watch for:
-- "dukalt" or "dukat" = bukalt (buccal, site="B")
-- "ett åtta" = 18 (tooth number)
-- "palatinal" variations: "palatal", "palatinalt" = P
-- "lingual" variations: "lingualt" = L
+The transcriptions often contain speech-to-text errors — misspelled dental terms, split tooth numbers ("ett åtta" = 18, "1.7" = 17), garbled site names. Use your knowledge of dental terminology and the context to infer the intended meaning.
 
 You have the full conversation history. When a site or number is mentioned without a tooth, use the most recently mentioned tooth.
 
@@ -147,7 +143,7 @@ export async function POST(request: NextRequest) {
     }
 
     const response = await anthropic.messages.create({
-      model: "claude-sonnet-4-5-20250929",
+      model: "claude-opus-4-6",
       max_tokens: 1024,
       system: SYSTEM_PROMPT,
       tools: [TOOL_DEFINITION, CLARIFY_TOOL],
@@ -162,9 +158,16 @@ export async function POST(request: NextRequest) {
     const toolCalls = allToolCalls.filter((tc) => tc.name === "record");
     const actions = toolCalls.map((tc) => tc.input);
 
-    const clarifications = allToolCalls
-      .filter((tc) => tc.name === "clarify")
-      .map((tc) => (tc.input as { message: string }).message);
+    // Collect clarifications from both clarify tool calls and plain text responses
+    const clarifications = [
+      ...allToolCalls
+        .filter((tc) => tc.name === "clarify")
+        .map((tc) => (tc.input as { message: string }).message),
+      ...response.content
+        .filter((block): block is Anthropic.TextBlock => block.type === "text")
+        .map((block) => block.text)
+        .filter((text) => text.trim().length > 0),
+    ];
 
     return NextResponse.json({ actions, toolCalls: allToolCalls, clarifications });
   } catch (error) {
