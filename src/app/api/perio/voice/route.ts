@@ -78,14 +78,22 @@ Common Swedish dental speech patterns:
 
 When the clinician gives two numbers for a tooth (e.g. "16 5 4" or "16 distal 5 mesial 4"), make TWO tool calls — one per site.
 
+You have the full conversation history. When a site or number is mentioned without a tooth, use the most recently mentioned tooth.
+
 NEVER call record() without at least one measurement field. Every call must change something.`;
 
 export async function POST(request: NextRequest) {
   try {
-    const { transcript } = await request.json();
+    const body = await request.json();
 
-    if (!transcript || typeof transcript !== "string") {
-      return NextResponse.json({ error: "Missing transcript" }, { status: 400 });
+    // Backward compat: accept { transcript } string or { messages } array
+    let messages: Anthropic.MessageParam[];
+    if (Array.isArray(body.messages) && body.messages.length > 0) {
+      messages = body.messages;
+    } else if (body.transcript && typeof body.transcript === "string") {
+      messages = [{ role: "user", content: body.transcript }];
+    } else {
+      return NextResponse.json({ error: "Missing messages or transcript" }, { status: 400 });
     }
 
     const response = await anthropic.messages.create({
@@ -94,14 +102,16 @@ export async function POST(request: NextRequest) {
       system: SYSTEM_PROMPT,
       tools: [TOOL_DEFINITION],
       tool_choice: { type: "any" },
-      messages: [{ role: "user", content: transcript }],
+      messages,
     });
 
-    const actions = response.content
+    const toolCalls = response.content
       .filter((block): block is Anthropic.ToolUseBlock => block.type === "tool_use")
-      .map((block) => block.input as Record<string, unknown>);
+      .map((block) => ({ id: block.id, name: block.name, input: block.input as Record<string, unknown> }));
 
-    return NextResponse.json({ actions });
+    const actions = toolCalls.map((tc) => tc.input);
+
+    return NextResponse.json({ actions, toolCalls });
   } catch (error) {
     console.error("Perio voice error:", error);
     return NextResponse.json(

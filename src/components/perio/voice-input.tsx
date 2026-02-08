@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useVoiceInput, type VoiceLang } from "@/hooks/use-voice-input";
 import type { PerioAction, ToothNumber, MeasurementSite, CheckboxField, NumericField } from "@/lib/perio/types";
 import { ALL_TEETH } from "@/lib/perio/constants";
@@ -21,6 +21,84 @@ interface RecordAction {
   furcation?: boolean;
   missing?: boolean;
   comment?: string;
+}
+
+interface ToolCall {
+  id: string;
+  name: string;
+  input: RecordAction;
+}
+
+interface ConversationTurn {
+  transcript: string;
+  toolCalls: ToolCall[];
+  timestamp: number;
+}
+
+interface TraceEntry {
+  transcript: string;
+  messagesSent: number;
+  toolCalls: ToolCall[];
+  actionsApplied: number;
+  durationMs: number;
+  timestamp: number;
+}
+
+type MessageParam = {
+  role: "user" | "assistant";
+  content: string | ContentBlock[];
+};
+
+type ContentBlock =
+  | { type: "text"; text: string }
+  | { type: "tool_use"; id: string; name: string; input: Record<string, unknown> }
+  | { type: "tool_result"; tool_use_id: string; content: string };
+
+function buildMessages(history: ConversationTurn[], newTranscript: string): MessageParam[] {
+  const messages: MessageParam[] = [];
+
+  for (let i = 0; i < history.length; i++) {
+    const turn = history[i];
+
+    // User message with transcript (first turn or merged with previous tool_result)
+    if (i === 0) {
+      messages.push({ role: "user", content: turn.transcript });
+    }
+    // else: transcript was already merged into the previous user message
+
+    // Assistant message with tool_use blocks
+    if (turn.toolCalls.length > 0) {
+      messages.push({
+        role: "assistant",
+        content: turn.toolCalls.map((tc) => ({
+          type: "tool_use" as const,
+          id: tc.id,
+          name: tc.name,
+          input: tc.input as unknown as Record<string, unknown>,
+        })),
+      });
+
+      // User message: tool_results + next transcript merged together
+      const toolResults: ContentBlock[] = turn.toolCalls.map((tc) => ({
+        type: "tool_result" as const,
+        tool_use_id: tc.id,
+        content: "OK",
+      }));
+
+      const nextTranscript = i < history.length - 1 ? history[i + 1].transcript : newTranscript;
+      messages.push({
+        role: "user",
+        content: [...toolResults, { type: "text" as const, text: nextTranscript }],
+      });
+    }
+  }
+
+  // If no history at all, just send the new transcript
+  if (history.length === 0) {
+    messages.push({ role: "user", content: newTranscript });
+  }
+
+  return messages;
 }
 
 function toActions(record: RecordAction): PerioAction[] {
@@ -78,45 +156,105 @@ let logId = 0;
 export function VoiceInput({ dispatch }: VoiceInputProps) {
   const [lang, setLang] = useState<VoiceLang>("sv");
   const [log, setLog] = useState<LogEntry[]>([]);
+  const [conversationHistory, setConversationHistory] = useState<ConversationTurn[]>([]);
+  const conversationHistoryRef = useRef<ConversationTurn[]>([]);
+  const [traces, setTraces] = useState<TraceEntry[]>([]);
+  const pendingRef = useRef<Promise<void>>(Promise.resolve());
+  const prevListeningRef = useRef(false);
+
+  const [showDebug, setShowDebug] = useState(false);
+  useEffect(() => {
+    setShowDebug(process.env.NODE_ENV === "development" || new URLSearchParams(window.location.search).has("debug"));
+  }, []);
+
+  // Keep ref in sync
+  useEffect(() => {
+    conversationHistoryRef.current = conversationHistory;
+  }, [conversationHistory]);
 
   const handleCommit = useCallback(
-    async (transcript: string) => {
-      const id = ++logId;
-      setLog((prev) => [...prev, { id, transcript, actions: [], appliedCount: 0, status: "pending" }]);
+    (transcript: string) => {
+      pendingRef.current = pendingRef.current.then(async () => {
+        const id = ++logId;
+        const startTime = performance.now();
+        setLog((prev) => [...prev, { id, transcript, actions: [], appliedCount: 0, status: "pending" }]);
 
-      try {
-        const res = await fetch("/api/perio/voice", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ transcript }),
-        });
+        try {
+          const messages = buildMessages(conversationHistoryRef.current, transcript);
 
-        if (!res.ok) throw new Error("API error");
+          const res = await fetch("/api/perio/voice", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ messages }),
+          });
 
-        const { actions } = await res.json() as { actions: RecordAction[] };
+          if (!res.ok) throw new Error("API error");
 
-        let appliedCount = 0;
-        for (const record of actions) {
-          const perioActions = toActions(record);
-          for (const action of perioActions) {
-            dispatch(action);
-            appliedCount++;
+          const { actions, toolCalls } = await res.json() as {
+            actions: RecordAction[];
+            toolCalls: ToolCall[];
+          };
+
+          let appliedCount = 0;
+          for (const record of actions) {
+            const perioActions = toActions(record);
+            for (const action of perioActions) {
+              dispatch(action);
+              appliedCount++;
+            }
           }
-        }
 
-        setLog((prev) =>
-          prev.map((e) => (e.id === id ? { ...e, actions, appliedCount, status: "done" as const } : e)),
-        );
-      } catch {
-        setLog((prev) =>
-          prev.map((e) => (e.id === id ? { ...e, status: "error" as const } : e)),
-        );
-      }
+          // Append to conversation history
+          const turn: ConversationTurn = {
+            transcript,
+            toolCalls: toolCalls ?? [],
+            timestamp: Date.now(),
+          };
+          setConversationHistory((prev) => [...prev, turn]);
+
+          const durationMs = Math.round(performance.now() - startTime);
+          const trace: TraceEntry = {
+            transcript,
+            messagesSent: messages.length,
+            toolCalls: toolCalls ?? [],
+            actionsApplied: appliedCount,
+            durationMs,
+            timestamp: Date.now(),
+          };
+          setTraces((prev) => [...prev, trace]);
+
+          console.log("[perio-voice-trace]", trace);
+
+          setLog((prev) =>
+            prev.map((e) => (e.id === id ? { ...e, actions, appliedCount, status: "done" as const } : e)),
+          );
+        } catch {
+          setLog((prev) =>
+            prev.map((e) => (e.id === id ? { ...e, status: "error" as const } : e)),
+          );
+        }
+      });
     },
     [dispatch],
   );
 
   const { isListening, liveTranscript, error, toggle, supported } = useVoiceInput(handleCommit, lang);
+
+  // Reset conversation history when starting a new session
+  useEffect(() => {
+    if (isListening && !prevListeningRef.current) {
+      // false→true transition: new session
+      setConversationHistory([]);
+      conversationHistoryRef.current = [];
+      setLog([]);
+      if (traces.length > 0) {
+        console.log("[perio-voice-trace] session ended", { turns: traces.length, traces });
+      }
+      setTraces([]);
+      pendingRef.current = Promise.resolve();
+    }
+    prevListeningRef.current = isListening;
+  }, [isListening, traces]);
 
   if (!supported) return null;
 
@@ -221,6 +359,25 @@ export function VoiceInput({ dispatch }: VoiceInputProps) {
                 </div>
               </div>
             </div>
+          ))}
+        </div>
+      )}
+
+      {/* Debug panel */}
+      {showDebug && traces.length > 0 && (
+        <div className="space-y-1">
+          {traces.map((trace, i) => (
+            <details key={trace.timestamp} className="rounded-lg border border-[var(--brand-ink-10)] bg-[var(--brand-card)]">
+              <summary className="cursor-pointer px-3 py-2 text-[10px] font-medium text-[var(--brand-ink-40)]">
+                #{i + 1} &ldquo;{trace.transcript.slice(0, 40)}{trace.transcript.length > 40 ? "..." : ""}&rdquo;
+                <span className="ml-2 text-[var(--brand-ink-20)]">
+                  {trace.toolCalls.length} calls &middot; {trace.durationMs}ms &middot; {trace.messagesSent} msgs
+                </span>
+              </summary>
+              <pre className="max-h-48 overflow-auto px-3 py-2 text-[10px] leading-relaxed text-[var(--brand-ink-60)]">
+                {JSON.stringify(trace, null, 2)}
+              </pre>
+            </details>
           ))}
         </div>
       )}
