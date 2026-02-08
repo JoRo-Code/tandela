@@ -6,12 +6,20 @@ export async function GET() {
     return NextResponse.json({ error: "ELEVENLABS_API_KEY not configured" }, { status: 500 });
   }
 
-  const wsUrl = new URL("wss://api.elevenlabs.io/v1/speech-to-text/realtime");
-  wsUrl.searchParams.set("model_id", "scribe_v2");
-  wsUrl.searchParams.set("language_code", "sv");
-  wsUrl.searchParams.set("commit_strategy", "vad");
-  wsUrl.searchParams.set("vad_silence_threshold_secs", "1.5");
-  wsUrl.searchParams.set("token", apiKey);
+  const tokenRes = await fetch(
+    "https://api.elevenlabs.io/v1/single-use-token/realtime_scribe",
+    {
+      method: "POST",
+      headers: { "xi-api-key": apiKey },
+    },
+  );
 
-  return NextResponse.json({ wsUrl: wsUrl.toString() });
+  if (!tokenRes.ok) {
+    const body = await tokenRes.text();
+    console.error("ElevenLabs token error:", tokenRes.status, body);
+    return NextResponse.json({ error: "Failed to get ElevenLabs token" }, { status: 502 });
+  }
+
+  const { token } = await tokenRes.json();
+  return NextResponse.json({ token });
 }

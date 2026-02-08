@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useState } from "react";
-import { useVoiceInput } from "@/hooks/use-voice-input";
+import { useVoiceInput, type VoiceLang } from "@/hooks/use-voice-input";
 import type { PerioAction, ToothNumber, MeasurementSite, CheckboxField, NumericField } from "@/lib/perio/types";
 import { ALL_TEETH } from "@/lib/perio/constants";
 
@@ -78,6 +78,7 @@ interface LogEntry {
 let logId = 0;
 
 export function VoiceInput({ dispatch }: VoiceInputProps) {
+  const [lang, setLang] = useState<VoiceLang>("sv");
   const [log, setLog] = useState<LogEntry[]>([]);
 
   const handleCommit = useCallback(
@@ -117,7 +118,7 @@ export function VoiceInput({ dispatch }: VoiceInputProps) {
     [dispatch],
   );
 
-  const { isListening, liveTranscript, error, toggle, supported } = useVoiceInput(handleCommit);
+  const { isListening, liveTranscript, error, toggle, supported } = useVoiceInput(handleCommit, lang);
 
   if (!supported) return null;
 
@@ -125,6 +126,15 @@ export function VoiceInput({ dispatch }: VoiceInputProps) {
     <div className="space-y-3">
       {/* Controls */}
       <div className="flex items-center gap-3">
+        <button
+          type="button"
+          onClick={() => setLang(lang === "sv" ? "en" : "sv")}
+          disabled={isListening}
+          className="flex h-10 shrink-0 items-center justify-center rounded-full px-2.5 text-xs font-medium transition-all bg-[var(--brand-cream)] text-[var(--brand-ink)] border border-[var(--brand-ink-10)] hover:bg-[var(--brand-ink-5)] disabled:opacity-40"
+          aria-label="Byt språk"
+        >
+          {lang === "sv" ? "SV" : "EN"}
+        </button>
         <button
           type="button"
           onClick={toggle}
@@ -150,7 +160,7 @@ export function VoiceInput({ dispatch }: VoiceInputProps) {
           </svg>
         </button>
 
-        {isListening && (
+        {isListening && !error && (
           <div className="min-w-0 flex-1 rounded-lg bg-red-50 border border-red-200 px-3 py-2">
             <p className="text-xs font-medium text-red-600">Lyssnar...</p>
             {liveTranscript && (
@@ -159,7 +169,7 @@ export function VoiceInput({ dispatch }: VoiceInputProps) {
           </div>
         )}
 
-        {!isListening && error && (
+        {error && (
           <div className="min-w-0 flex-1 rounded-lg bg-red-50 border border-red-200 px-3 py-2">
             <p className="text-xs font-medium text-red-600">{error}</p>
           </div>
