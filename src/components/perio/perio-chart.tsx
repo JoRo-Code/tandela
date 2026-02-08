@@ -2,7 +2,7 @@
 
 import { useReducer, useMemo } from "react";
 import type { PerioExamination, PerioAction, ToothNumber } from "@/lib/perio/types";
-import { createEmptyExamination, createEmptySite } from "@/lib/perio/create-empty-examination";
+import { createEmptyExamination, createEmptySites } from "@/lib/perio/create-empty-examination";
 import { calculateSummary } from "@/lib/perio/calculations";
 import { JawTable } from "./jaw-table";
 import { TongueDivider } from "./tongue-divider";
@@ -40,7 +40,7 @@ function perioReducer(state: PerioExamination, action: PerioAction): PerioExamin
         missing: !wasMissing,
         // Reset site data when marking as missing
         ...(!wasMissing && {
-          sites: { D: createEmptySite(), M: createEmptySite() },
+          sites: createEmptySites(action.tooth),
           comment: "",
         }),
       });

@@ -1,7 +1,7 @@
 "use client";
 
 import type { PerioExamination, PerioAction, ToothNumber, MeasurementSite, CheckboxField, NumericField } from "@/lib/perio/types";
-import { UPPER_JAW_TEETH, LOWER_JAW_TEETH, UPPER_ROW_ORDER, LOWER_ROW_ORDER, ROW_LABELS, MULTI_ROOTED_TEETH } from "@/lib/perio/constants";
+import { UPPER_JAW_TEETH, LOWER_JAW_TEETH, UPPER_ROW_ORDER, LOWER_ROW_ORDER, ROW_LABELS, TOOTH_SITE_CONFIGS } from "@/lib/perio/constants";
 import { CheckboxCell } from "./checkbox-cell";
 import { NumericCell } from "./numeric-cell";
 import { useCallback } from "react";
@@ -44,14 +44,13 @@ export function JawTable({ jaw, examination, dispatch }: JawTableProps) {
       <table className="w-full border-collapse" style={{ tableLayout: "fixed", minWidth: 900 }}>
         <colgroup>
           <col style={{ width: 90 }} />
-          {teeth.flatMap((t) => [
-            <col key={`${t}-d`} style={{ width: 28 }} />,
-            <col key={`${t}-m`} style={{ width: 28 }} />,
-          ])}
+          {teeth.map((t) => (
+            <col key={t} style={{ width: 58 }} />
+          ))}
         </colgroup>
 
         <thead>
-          {/* Tooth numbers row */}
+          {/* Tooth numbers */}
           <tr>
             <th className="sticky left-0 z-10 bg-[var(--brand-card)] p-1" />
             {teeth.map((t, i) => {
@@ -59,7 +58,6 @@ export function JawTable({ jaw, examination, dispatch }: JawTableProps) {
               return (
                 <th
                   key={t}
-                  colSpan={2}
                   className={`
                     p-1 text-center font-mono text-xs font-semibold
                     ${i === 8 ? "border-l-2 border-[var(--brand-ink-20)]" : i > 0 ? "border-l border-[var(--brand-ink-10)]" : ""}
@@ -82,78 +80,73 @@ export function JawTable({ jaw, examination, dispatch }: JawTableProps) {
               );
             })}
           </tr>
-          {/* D | M sub-headers */}
-          <tr>
-            <th className="sticky left-0 z-10 bg-[var(--brand-card)] p-0" />
-            {teeth.map((t, i) => (
-              <th
-                key={`${t}-sub`}
-                colSpan={2}
-                className={`
-                  p-0 ${i === 8 ? "border-l-2 border-[var(--brand-ink-20)]" : i > 0 ? "border-l border-[var(--brand-ink-10)]" : ""}
-                `}
-              >
-                <div className="flex justify-around text-[9px] text-[var(--brand-ink-40)]">
-                  <span>D</span>
-                  <span>M</span>
-                </div>
-              </th>
-            ))}
-          </tr>
         </thead>
 
         <tbody>
-          {rowOrder.map((rowKey) => (
-            <tr key={rowKey} className="group">
-              {/* Row label */}
-              <td className="sticky left-0 z-10 bg-[var(--brand-cream)] px-2 py-1.5 text-[10px] font-semibold text-[var(--brand-olive)] whitespace-nowrap">
-                {ROW_LABELS[rowKey]}
-              </td>
+          {rowOrder.map((rowKey) => {
+            const isFurcation = rowKey === "furcation";
 
-              {/* Cells for each tooth */}
-              {teeth.map((toothNum, toothIdx) => {
-                const tooth = examination.teeth[toothNum];
-                const isMissing = tooth.missing;
-                const isMidline = toothIdx === 8;
+            return (
+              <tr key={rowKey}>
+                <td className="sticky left-0 z-10 bg-[var(--brand-cream)] px-2 py-1 text-[10px] font-semibold text-[var(--brand-olive)] whitespace-nowrap">
+                  {ROW_LABELS[rowKey]}
+                </td>
 
-                return (["D", "M"] as MeasurementSite[]).map((site, siteIdx) => (
-                  <td
-                    key={`${toothNum}-${site}-${rowKey}`}
-                    className={`
-                      p-0.5 text-center
-                      ${isMissing ? "opacity-20 pointer-events-none" : ""}
-                      ${isMidline && siteIdx === 0 ? "border-l-2 border-[var(--brand-ink-20)]" : !isMidline && siteIdx === 0 && toothIdx > 0 ? "border-l border-[var(--brand-ink-10)]" : ""}
-                    `}
-                  >
-                    <div className="flex items-center justify-center">
-                      {isCheckboxRow(rowKey) ? (
-                        rowKey === "furcation" && !MULTI_ROOTED_TEETH.has(toothNum) ? (
-                          <span className="flex h-5 w-5 items-center justify-center text-[9px] text-[var(--brand-ink-10)]">–</span>
-                        ) : (
-                        <CheckboxCell
-                          checked={tooth.sites[site][rowKey]}
-                          onChange={(val) => handleCheckbox(toothNum, site, rowKey, val)}
-                          variant={rowKey}
-                          disabled={isMissing}
-                          ariaLabel={`${ROW_LABELS[rowKey]}, tand ${toothNum}, ${site === "D" ? "distal" : "mesial"}`}
-                        />)
+                {teeth.map((toothNum, toothIdx) => {
+                  const tooth = examination.teeth[toothNum];
+                  const isMissing = tooth.missing;
+                  const isMidline = toothIdx === 8;
+                  const config = TOOTH_SITE_CONFIGS[toothNum];
+                  const sites = isFurcation ? config.furcation : config.general;
+
+                  return (
+                    <td
+                      key={`${toothNum}-${rowKey}`}
+                      className={`
+                        p-0 align-middle
+                        ${isMissing ? "opacity-20 pointer-events-none" : ""}
+                        ${isMidline ? "border-l-2 border-[var(--brand-ink-20)]" : toothIdx > 0 ? "border-l border-[var(--brand-ink-10)]" : ""}
+                      `}
+                    >
+                      {sites.length === 0 ? (
+                        <div className="flex h-5 items-center justify-center">
+                          <span className="text-[8px] text-[var(--brand-ink-10)]">–</span>
+                        </div>
                       ) : (
-                        <NumericCell
-                          value={tooth.sites[site][rowKey]}
-                          onChange={(val) => handleNumeric(toothNum, site, rowKey, val)}
-                          min={0}
-                          max={rowKey === "pocketDepth" ? 12 : 3}
-                          disabled={isMissing}
-                          alert={rowKey === "pocketDepth" && (tooth.sites[site].pocketDepth ?? 0) >= 4}
-                          ariaLabel={`${ROW_LABELS[rowKey]}, tand ${toothNum}, ${site === "D" ? "distal" : "mesial"}`}
-                        />
+                        <div className="flex justify-center gap-px py-0.5">
+                          {sites.map((site) => (
+                            <div key={site} className="flex items-center justify-center">
+                              {isCheckboxRow(rowKey) ? (
+                                <CheckboxCell
+                                  checked={tooth.sites[site]?.[rowKey] ?? false}
+                                  onChange={(val) => handleCheckbox(toothNum, site, rowKey, val)}
+                                  variant={rowKey}
+                                  label={site}
+                                  disabled={isMissing}
+                                  ariaLabel={`${ROW_LABELS[rowKey]}, tand ${toothNum}, ${site}`}
+                                />
+                              ) : (
+                                <NumericCell
+                                  value={tooth.sites[site]?.[rowKey] ?? null}
+                                  onChange={(val) => handleNumeric(toothNum, site, rowKey, val)}
+                                  label={site}
+                                  min={0}
+                                  max={rowKey === "pocketDepth" ? 12 : 3}
+                                  disabled={isMissing}
+                                  alert={rowKey === "pocketDepth" && (tooth.sites[site]?.pocketDepth ?? 0) >= 4}
+                                  ariaLabel={`${ROW_LABELS[rowKey]}, tand ${toothNum}, ${site}`}
+                                />
+                              )}
+                            </div>
+                          ))}
+                        </div>
                       )}
-                    </div>
-                  </td>
-                ));
-              })}
-            </tr>
-          ))}
+                    </td>
+                  );
+                })}
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </div>

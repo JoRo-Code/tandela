@@ -4,16 +4,16 @@ import { memo } from "react";
 
 const VARIANT_STYLES = {
   bleeding: {
-    checked: "bg-red-500 border-red-500",
-    icon: "text-white",
+    checked: "bg-red-500 border-red-500 text-white",
+    unchecked: "border-[var(--brand-ink-20)] bg-transparent text-[var(--brand-ink-20)]",
   },
   plaque: {
-    checked: "bg-[var(--brand-olive)] border-[var(--brand-olive)]",
-    icon: "text-white",
+    checked: "bg-[var(--brand-olive)] border-[var(--brand-olive)] text-white",
+    unchecked: "border-[var(--brand-ink-20)] bg-transparent text-[var(--brand-ink-20)]",
   },
   furcation: {
-    checked: "bg-[var(--brand-ink)] border-[var(--brand-ink)]",
-    icon: "text-[var(--brand-sand)]",
+    checked: "bg-[var(--brand-ink)] border-[var(--brand-ink)] text-[var(--brand-sand)]",
+    unchecked: "border-[var(--brand-ink-20)] bg-transparent text-[var(--brand-ink-20)]",
   },
 } as const;
 
@@ -21,6 +21,7 @@ interface CheckboxCellProps {
   checked: boolean;
   onChange: (value: boolean) => void;
   variant: keyof typeof VARIANT_STYLES;
+  label: string;
   disabled?: boolean;
   ariaLabel?: string;
 }
@@ -29,6 +30,7 @@ export const CheckboxCell = memo(function CheckboxCell({
   checked,
   onChange,
   variant,
+  label,
   disabled,
   ariaLabel,
 }: CheckboxCellProps) {
@@ -43,26 +45,15 @@ export const CheckboxCell = memo(function CheckboxCell({
       disabled={disabled}
       onClick={() => onChange(!checked)}
       className={`
-        flex h-5 w-5 items-center justify-center rounded
+        flex h-4 w-4 items-center justify-center rounded-sm
         border transition-colors duration-100
+        text-[8px] font-bold leading-none select-none
         focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-ember)] focus-visible:ring-offset-1
         disabled:cursor-not-allowed
-        ${checked ? styles.checked : "border-[var(--brand-ink-20)] bg-transparent"}
+        ${checked ? styles.checked : styles.unchecked}
       `}
     >
-      {checked && (
-        <svg
-          className={`h-3 w-3 ${styles.icon}`}
-          viewBox="0 0 12 12"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth={2.5}
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          <path d="M2.5 6l2.5 2.5 4.5-5" />
-        </svg>
-      )}
+      {label}
     </button>
   );
 });

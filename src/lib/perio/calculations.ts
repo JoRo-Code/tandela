@@ -1,5 +1,5 @@
-import type { PerioExamination, PerioSummary } from "./types";
-import { ALL_TEETH } from "./constants";
+import type { PerioExamination, PerioSummary, MeasurementSite } from "./types";
+import { ALL_TEETH, TOOTH_SITE_CONFIGS } from "./constants";
 
 export function calculateSummary(exam: PerioExamination): PerioSummary {
   let totalSites = 0;
@@ -10,10 +10,13 @@ export function calculateSummary(exam: PerioExamination): PerioSummary {
     const tooth = exam.teeth[toothNum];
     if (tooth.missing) continue;
 
-    for (const site of ["D", "M"] as const) {
+    const sites = TOOTH_SITE_CONFIGS[toothNum].general;
+    for (const site of sites) {
+      const m = tooth.sites[site];
+      if (!m) continue;
       totalSites++;
-      if (tooth.sites[site].bleeding) bleedingSites++;
-      if (tooth.sites[site].plaque) plaqueSites++;
+      if (m.bleeding) bleedingSites++;
+      if (m.plaque) plaqueSites++;
     }
   }
 

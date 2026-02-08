@@ -5,8 +5,8 @@ export type ToothNumber =
   | 31 | 32 | 33 | 34 | 35 | 36 | 37 | 38
   | 41 | 42 | 43 | 44 | 45 | 46 | 47 | 48;
 
-/** D = Distal, M = Mesial */
-export type MeasurementSite = "D" | "M";
+/** Measurement sites: B=buccal, D=distal, M=mesial, P=palatinal, L=lingual */
+export type MeasurementSite = "B" | "D" | "M" | "P" | "L";
 
 export interface SiteMeasurement {
   furcation: boolean;
@@ -19,7 +19,7 @@ export interface SiteMeasurement {
 export interface ToothData {
   toothNumber: ToothNumber;
   missing: boolean;
-  sites: Record<MeasurementSite, SiteMeasurement>;
+  sites: Partial<Record<MeasurementSite, SiteMeasurement>>;
   comment: string;
 }
 
