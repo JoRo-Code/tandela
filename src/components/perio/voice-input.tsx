@@ -194,25 +194,32 @@ export function VoiceInput({ dispatch }: VoiceInputProps) {
   }, [conversationHistory]);
 
   const handleCommit = useCallback(
-    (transcript: string, audioBlob: Blob | null) => {
-      if (!transcript.trim()) return;
+    (scribeTranscript: string, audioBlob: Blob | null) => {
+      if (!scribeTranscript.trim()) return;
       pendingRef.current = pendingRef.current.then(async () => {
         const id = ++logId;
         const startTime = performance.now();
-        setLog((prev) => [...prev, { id, transcript, whisperTranscript: null, actions: [], appliedCount: 0, clarifications: [], status: "pending" }]);
+        setLog((prev) => [...prev, { id, transcript: scribeTranscript, whisperTranscript: null, actions: [], appliedCount: 0, clarifications: [], status: "pending" }]);
 
         try {
-          const messages = buildMessages(conversationHistoryRef.current, transcript);
+          // Get Whisper transcript (if audio available)
+          const whisperText = audioBlob ? await transcribeWithWhisper(audioBlob, lang) : null;
 
-          // Run Claude + Whisper in parallel
-          const [claudeRes, whisperText] = await Promise.all([
-            fetch("/api/perio/voice", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ messages }),
-            }),
-            audioBlob ? transcribeWithWhisper(audioBlob, lang) : Promise.resolve(null),
-          ]);
+          // Build the transcript to send — combine both when Whisper is available
+          let activeTranscript: string;
+          if (whisperText) {
+            activeTranscript = `[Scribe]: ${scribeTranscript}\n[Whisper]: ${whisperText}`;
+          } else {
+            activeTranscript = scribeTranscript;
+          }
+
+          const messages = buildMessages(conversationHistoryRef.current, activeTranscript);
+
+          const claudeRes = await fetch("/api/perio/voice", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ messages }),
+          });
 
           if (!claudeRes.ok) throw new Error("API error");
 
@@ -231,9 +238,9 @@ export function VoiceInput({ dispatch }: VoiceInputProps) {
             }
           }
 
-          // Append to conversation history
+          // Append to conversation history (using the transcript that was actually sent)
           const turn: ConversationTurn = {
-            transcript,
+            transcript: activeTranscript,
             toolCalls: toolCalls ?? [],
             timestamp: Date.now(),
           };
@@ -241,7 +248,7 @@ export function VoiceInput({ dispatch }: VoiceInputProps) {
 
           const durationMs = Math.round(performance.now() - startTime);
           const trace: TraceEntry = {
-            transcript,
+            transcript: activeTranscript,
             messagesSent: messages.length,
             toolCalls: toolCalls ?? [],
             actionsApplied: appliedCount,
@@ -250,7 +257,7 @@ export function VoiceInput({ dispatch }: VoiceInputProps) {
           };
           setTraces((prev) => [...prev, trace]);
 
-          console.log("[perio-voice-trace]", { ...trace, whisperTranscript: whisperText });
+          console.log("[perio-voice-trace]", { ...trace, scribeTranscript, whisperTranscript: whisperText });
 
           setLog((prev) =>
             prev.map((e) => (e.id === id ? { ...e, actions, appliedCount, clarifications, whisperTranscript: whisperText, status: "done" as const } : e)),
@@ -363,7 +370,7 @@ export function VoiceInput({ dispatch }: VoiceInputProps) {
                     <span className="text-[var(--brand-ink-40)] font-medium">Scribe:</span> &ldquo;{entry.transcript}&rdquo;
                   </p>
                   {entry.whisperTranscript !== null && (
-                    <p className="text-xs text-[var(--brand-ink-60)]">
+                    <p className="text-xs text-[var(--brand-ink)]">
                       <span className="text-[var(--brand-ink-40)] font-medium">Whisper:</span> &ldquo;{entry.whisperTranscript}&rdquo;
                     </p>
                   )}
