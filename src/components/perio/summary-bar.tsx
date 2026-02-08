@@ -6,7 +6,7 @@ interface SummaryBarProps {
 
 export function SummaryBar({ summary }: SummaryBarProps) {
   return (
-    <div className="flex items-center gap-4 text-xs">
+    <div className="flex items-center gap-2 sm:gap-4 text-xs">
       <div className="rounded-md bg-[var(--brand-cream)] border border-[var(--brand-ink-10)] px-3 py-1.5">
         <span className="text-[var(--brand-olive)]">BVS: </span>
         <span className="font-mono font-semibold text-[var(--brand-ink)]">

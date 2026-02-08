@@ -40,8 +40,8 @@ export function JawTable({ jaw, examination, dispatch }: JawTableProps) {
   );
 
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full border-collapse" style={{ tableLayout: "fixed", minWidth: 900 }}>
+    <div className="overflow-x-auto -mx-1 px-1 sm:mx-0 sm:px-0">
+      <table className="border-collapse" style={{ tableLayout: "fixed", minWidth: 900 }}>
         <colgroup>
           <col style={{ width: 90 }} />
           {teeth.map((t) => (
@@ -52,7 +52,7 @@ export function JawTable({ jaw, examination, dispatch }: JawTableProps) {
         <thead>
           {/* Tooth numbers */}
           <tr>
-            <th className="sticky left-0 z-10 bg-[var(--brand-card)] p-1" />
+            <th className="sticky left-0 z-20 bg-[var(--brand-card)] p-1" />
             {teeth.map((t, i) => {
               const isMissing = examination.teeth[t].missing;
               return (
@@ -88,7 +88,7 @@ export function JawTable({ jaw, examination, dispatch }: JawTableProps) {
 
             return (
               <tr key={rowKey}>
-                <td className="sticky left-0 z-10 bg-[var(--brand-cream)] px-2 py-1 text-[10px] font-semibold text-[var(--brand-olive)] whitespace-nowrap">
+                <td className="sticky left-0 z-10 bg-[var(--brand-card)] px-2 py-1 text-[10px] font-semibold text-[var(--brand-olive)] whitespace-nowrap shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)]">
                   {ROW_LABELS[rowKey]}
                 </td>
 

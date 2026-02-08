@@ -75,7 +75,7 @@ export function PerioChart() {
 
       <VoiceInput dispatch={dispatch} />
 
-      <div className="rounded-2xl border border-[var(--brand-ink-10)] bg-[var(--brand-card)] p-3">
+      <div className="rounded-2xl border border-[var(--brand-ink-10)] bg-[var(--brand-card)] p-1 sm:p-3">
         <JawTable jaw="upper" examination={examination} dispatch={dispatch} />
         <TongueDivider />
         <JawTable jaw="lower" examination={examination} dispatch={dispatch} />
