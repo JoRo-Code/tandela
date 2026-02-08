@@ -68,6 +68,7 @@ interface LogEntry {
   id: number;
   transcript: string;
   actions: RecordAction[];
+  appliedCount: number;
   status: "pending" | "done" | "error";
 }
 
@@ -79,7 +80,7 @@ export function VoiceInput({ dispatch }: VoiceInputProps) {
   const handleTranscript = useCallback(
     async (transcript: string) => {
       const id = ++logId;
-      setLog((prev) => [...prev, { id, transcript, actions: [], status: "pending" }]);
+      setLog((prev) => [...prev, { id, transcript, actions: [], appliedCount: 0, status: "pending" }]);
 
       try {
         const res = await fetch("/api/perio/voice", {
@@ -92,14 +93,17 @@ export function VoiceInput({ dispatch }: VoiceInputProps) {
 
         const { actions } = await res.json() as { actions: RecordAction[] };
 
+        let appliedCount = 0;
         for (const record of actions) {
-          for (const action of toActions(record)) {
+          const perioActions = toActions(record);
+          for (const action of perioActions) {
             dispatch(action);
+            appliedCount++;
           }
         }
 
         setLog((prev) =>
-          prev.map((e) => (e.id === id ? { ...e, actions, status: "done" as const } : e)),
+          prev.map((e) => (e.id === id ? { ...e, actions, appliedCount, status: "done" as const } : e)),
         );
       } catch {
         setLog((prev) =>
@@ -185,7 +189,13 @@ export function VoiceInput({ dispatch }: VoiceInputProps) {
                           {formatAction(a)}
                         </span>
                       ))}
+                      <span className="inline-flex rounded px-1.5 py-0.5 text-[10px] text-[var(--brand-ink-40)]">
+                        {entry.appliedCount} uppdaterade
+                      </span>
                     </div>
+                  )}
+                  {entry.status === "done" && entry.actions.length === 0 && (
+                    <p className="mt-0.5 text-[10px] text-amber-600">Inga värden tolkade</p>
                   )}
                   {entry.status === "error" && (
                     <p className="mt-0.5 text-[10px] text-red-500">Kunde inte tolka</p>

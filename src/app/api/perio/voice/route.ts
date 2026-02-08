@@ -58,22 +58,27 @@ const TOOL_DEFINITION: Anthropic.Tool = {
 
 const SYSTEM_PROMPT = `You are an assistant helping a Swedish dental clinician record periodontal examination data.
 
-The clinician will dictate measurements in Swedish. Your job is to interpret what they say and call the "record" tool for each measurement.
+The clinician dictates measurements in Swedish. Call the "record" tool for EVERY measurement — you MUST always include at least one measurement value (pocketDepth, bleeding, plaque, furcation, gingivalMargin, or missing).
 
-Common patterns:
-- "tand 16 distal fickdjup 5" → record(tooth=16, site=D, pocketDepth=5)
-- "blödning" (after a tooth/site) → record(tooth=..., site=..., bleeding=true)
-- "mesial 4" → record(tooth=..., site=M, pocketDepth=4)
-- "saknas" → record(tooth=..., missing=true)
+CRITICAL RULES:
+- When a clinician says a number after a tooth/site, it is ALWAYS pocketDepth unless they explicitly say "marginal gingiva" or "recession".
+- When they just say a tooth number and site with no qualifier, they are about to give pocket depth — but if you only hear the tooth/site, still record pocketDepth=0 as a placeholder rather than calling with no values.
+- A bare number like "5" or "4" after mentioning a tooth = pocketDepth.
+
+Common Swedish dental speech patterns:
+- "tand 16 distal 5" → record(tooth=16, site="D", pocketDepth=5)
+- "mesial 4" → record(tooth=16, site="M", pocketDepth=4)  [same tooth as before]
+- "blödning" → bleeding=true on the current tooth/site
 - "plack" → plaque=true
 - "furkation" → furcation=true
+- "saknas" or "17 saknas" → record(tooth=17, missing=true)
 - "marg gingiva minus 2" or "recession 2" → gingivalMargin=-2
+- "distal 5 3" means distal pocketDepth=5, mesial pocketDepth=3
+- "5 4" for a tooth means distal=5, mesial=4 (two calls)
 
-When the clinician lists multiple values for the same tooth, call the tool once per site with all values for that site combined.
+When the clinician gives two numbers for a tooth (e.g. "16 5 4" or "16 distal 5 mesial 4"), make TWO tool calls — one per site.
 
-If the clinician says values for both sites of the same tooth (e.g. "distal 5 mesial 4"), make two separate tool calls.
-
-Always call the tool. Never respond with text unless you genuinely cannot interpret what was said.`;
+NEVER call record() without at least one measurement field. Every call must change something.`;
 
 export async function POST(request: NextRequest) {
   try {
@@ -88,6 +93,7 @@ export async function POST(request: NextRequest) {
       max_tokens: 1024,
       system: SYSTEM_PROMPT,
       tools: [TOOL_DEFINITION],
+      tool_choice: { type: "any" },
       messages: [{ role: "user", content: transcript }],
     });
 
@@ -96,7 +102,7 @@ export async function POST(request: NextRequest) {
       .filter((block): block is Anthropic.ToolUseBlock => block.type === "tool_use")
       .map((block) => block.input as Record<string, unknown>);
 
-    return NextResponse.json({ actions: toolCalls });
+    return NextResponse.json({ actions: toolCalls, transcript });
   } catch (error) {
     console.error("Perio voice error:", error);
     return NextResponse.json(
