@@ -20,8 +20,8 @@ const TOOL_DEFINITION: Anthropic.Tool = {
       },
       site: {
         type: "string",
-        enum: ["D", "M"],
-        description: "Measurement site: D=distal, M=mesial. Omit for tooth-level operations like missing.",
+        enum: ["D", "B", "M", "P", "L"],
+        description: "Measurement site: D=distal, B=buccal, M=mesial, P=palatinal (upper jaw), L=lingual (lower jaw). Omit for tooth-level operations like missing.",
       },
       pocketDepth: {
         type: "number",
@@ -79,27 +79,46 @@ The clinician dictates measurements in Swedish. Call the "record" tool for EVERY
 
 If the dictation is unclear, garbled, or you cannot confidently determine what was said, use the "clarify" tool to ask a short question in Swedish. Do NOT guess — it is better to ask than to record wrong data. If the transcript is just filler sounds (e.g. "mhm", "eh", "okej") with no dental data, do not call any tool.
 
+MEASUREMENT SITES:
+Each tooth has 4 measurement sites for pocket depth, gingival margin, bleeding, and plaque:
+- Quadrant 1 (upper right, teeth 11-18): D (distal), B (buccal), P (palatinal), M (mesial)
+- Quadrant 2 (upper left, teeth 21-28): B (buccal), D (distal), M (mesial), P (palatinal)
+- Quadrant 3 (lower left, teeth 31-38): M (mesial), L (lingual), B (buccal), D (distal)
+- Quadrant 4 (lower right, teeth 41-48): L (lingual), M (mesial), D (distal), B (buccal)
+
+Upper jaw uses P (palatinal), lower jaw uses L (lingual) — never both on the same tooth.
+
+Furcation sites (molars/premolars only):
+- Q1 molars: D, B, M — Q1 premolars: D, M
+- Q2 molars: M, B, D — Q2 premolars: M, D
+- Q3/Q4 molars: B, L — no furcation on premolars/anteriors
+
+Swedish site names: distal=D, mesial=M, buckalt/bukalt=B, palatinalt=P, lingualt=L.
+
 CRITICAL RULES:
 - When a clinician says a number after a tooth/site, it is ALWAYS pocketDepth unless they explicitly say "marginal gingiva" or "recession".
 - When they just say a tooth number and site with no qualifier, they are about to give pocket depth — but if you only hear the tooth/site, still record pocketDepth=0 as a placeholder rather than calling with no values.
 - A bare number like "5" or "4" after mentioning a tooth = pocketDepth.
+- Make one tool call per site. If multiple sites are mentioned, make multiple calls.
 
 Common Swedish dental speech patterns:
 - "tand 16 distal 5" → record(tooth=16, site="D", pocketDepth=5)
 - "mesial 4" → record(tooth=16, site="M", pocketDepth=4)  [same tooth as before]
+- "buckalt 3" → record(tooth=16, site="B", pocketDepth=3)
+- "palatinalt 2" → record(tooth=16, site="P", pocketDepth=2)
+- "lingualt 3" → record(tooth=36, site="L", pocketDepth=3)  [lower jaw]
 - "blödning" → bleeding=true on the current tooth/site
 - "plack" → plaque=true
 - "furkation" → furcation=true
 - "saknas" or "17 saknas" → record(tooth=17, missing=true)
 - "marg gingiva minus 2" or "recession 2" → gingivalMargin=-2
-- "distal 5 3" means distal pocketDepth=5, mesial pocketDepth=3
-- "5 4" for a tooth means distal=5, mesial=4 (two calls)
+- "distal 5 mesial 3" → two calls: site="D" pocketDepth=5, site="M" pocketDepth=3
 
 Common transcription errors to watch for:
-- "dukalt" or "dukat" = bukalt (buccal)
+- "dukalt" or "dukat" = bukalt (buccal, site="B")
 - "ett åtta" = 18 (tooth number)
-
-When the clinician gives two numbers for a tooth (e.g. "16 5 4" or "16 distal 5 mesial 4"), make TWO tool calls — one per site.
+- "palatinal" variations: "palatal", "palatinalt" = P
+- "lingual" variations: "lingualt" = L
 
 You have the full conversation history. When a site or number is mentioned without a tooth, use the most recently mentioned tooth.
 
