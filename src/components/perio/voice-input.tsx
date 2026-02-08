@@ -117,7 +117,7 @@ export function VoiceInput({ dispatch }: VoiceInputProps) {
     [dispatch],
   );
 
-  const { isListening, liveTranscript, toggle, supported } = useVoiceInput(handleCommit);
+  const { isListening, liveTranscript, error, toggle, supported } = useVoiceInput(handleCommit);
 
   if (!supported) return null;
 
@@ -159,7 +159,13 @@ export function VoiceInput({ dispatch }: VoiceInputProps) {
           </div>
         )}
 
-        {!isListening && log.length === 0 && (
+        {!isListening && error && (
+          <div className="min-w-0 flex-1 rounded-lg bg-red-50 border border-red-200 px-3 py-2">
+            <p className="text-xs font-medium text-red-600">{error}</p>
+          </div>
+        )}
+
+        {!isListening && !error && log.length === 0 && (
           <p className="text-xs text-[var(--brand-ink-40)]">Tryck för att börja diktera</p>
         )}
       </div>

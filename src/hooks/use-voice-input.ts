@@ -5,6 +5,7 @@ import { useState, useCallback, useRef, useEffect } from "react";
 interface UseVoiceInputReturn {
   isListening: boolean;
   liveTranscript: string;
+  error: string | null;
   start: () => void;
   stop: () => void;
   toggle: () => void;
@@ -15,6 +16,7 @@ export function useVoiceInput(onCommit: (transcript: string) => void): UseVoiceI
   const [isListening, setIsListening] = useState(false);
   const [liveTranscript, setLiveTranscript] = useState("");
   const [supported, setSupported] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const wsRef = useRef<WebSocket | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -26,7 +28,7 @@ export function useVoiceInput(onCommit: (transcript: string) => void): UseVoiceI
     setSupported(typeof navigator !== "undefined" && !!navigator.mediaDevices?.getUserMedia);
   }, []);
 
-  const stop = useCallback(() => {
+  const cleanup = useCallback(() => {
     processorRef.current?.disconnect();
     processorRef.current = null;
     contextRef.current?.close();
@@ -41,19 +43,37 @@ export function useVoiceInput(onCommit: (transcript: string) => void): UseVoiceI
 
   const start = useCallback(async () => {
     if (!supported) return;
+    setError(null);
 
     try {
-      // Get WebSocket URL with token from our backend
+      // 1. Get mic access first (so the user sees the permission prompt immediately)
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      streamRef.current = stream;
+      setIsListening(true);
+
+      // 2. Get WebSocket URL with token from our backend
       const tokenRes = await fetch("/api/perio/voice/token");
-      if (!tokenRes.ok) throw new Error("Failed to get token");
+      if (!tokenRes.ok) {
+        const body = await tokenRes.json().catch(() => ({}));
+        throw new Error(body.error || `Token error ${tokenRes.status}`);
+      }
       const { wsUrl } = await tokenRes.json();
 
-      // Connect to ElevenLabs realtime STT
+      // 3. Connect to ElevenLabs realtime STT
       const ws = new WebSocket(wsUrl);
       wsRef.current = ws;
       committedTextRef.current = "";
       setLiveTranscript("");
 
+      // Wait for open
+      await new Promise<void>((resolve, reject) => {
+        ws.onopen = () => resolve();
+        ws.onerror = () => reject(new Error("WebSocket-anslutning misslyckades"));
+        // Timeout after 5s
+        setTimeout(() => reject(new Error("WebSocket timeout")), 5000);
+      });
+
+      // Set up message handler
       ws.onmessage = (event) => {
         const msg = JSON.parse(event.data);
 
@@ -69,28 +89,19 @@ export function useVoiceInput(onCommit: (transcript: string) => void): UseVoiceI
       };
 
       ws.onerror = () => {
-        stop();
+        setError("WebSocket-fel");
+        cleanup();
       };
 
       ws.onclose = () => {
         setIsListening(false);
       };
 
-      // Wait for WebSocket to open before streaming audio
-      await new Promise<void>((resolve, reject) => {
-        ws.onopen = () => resolve();
-        ws.onerror = () => reject(new Error("WebSocket connection failed"));
-      });
-
-      // Capture mic audio and stream PCM chunks to WebSocket
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      streamRef.current = stream;
-
+      // 4. Stream mic audio as PCM to WebSocket
       const audioContext = new AudioContext({ sampleRate: 16000 });
       contextRef.current = audioContext;
 
       const source = audioContext.createMediaStreamSource(stream);
-      // ScriptProcessorNode with 4096 buffer size, mono
       const processor = audioContext.createScriptProcessor(4096, 1, 1);
       processorRef.current = processor;
 
@@ -98,36 +109,37 @@ export function useVoiceInput(onCommit: (transcript: string) => void): UseVoiceI
         if (ws.readyState !== WebSocket.OPEN) return;
 
         const float32 = e.inputBuffer.getChannelData(0);
-        // Convert Float32 to Int16 PCM
         const int16 = new Int16Array(float32.length);
         for (let i = 0; i < float32.length; i++) {
           const s = Math.max(-1, Math.min(1, float32[i]));
           int16[i] = s < 0 ? s * 0x8000 : s * 0x7fff;
         }
 
-        // Send as base64
         const bytes = new Uint8Array(int16.buffer);
         let binary = "";
         for (let i = 0; i < bytes.length; i++) {
           binary += String.fromCharCode(bytes[i]);
         }
-        const base64 = btoa(binary);
 
         ws.send(JSON.stringify({
           message_type: "input_audio_chunk",
-          audio_base_64: base64,
+          audio_base_64: btoa(binary),
         }));
       };
 
       source.connect(processor);
       processor.connect(audioContext.destination);
-
-      setIsListening(true);
     } catch (err) {
-      console.error("Voice input error:", err);
-      stop();
+      const msg = err instanceof Error ? err.message : "Okänt fel";
+      console.error("Voice input error:", msg);
+      setError(msg);
+      cleanup();
     }
-  }, [supported, onCommit, stop]);
+  }, [supported, onCommit, cleanup]);
+
+  const stop = useCallback(() => {
+    cleanup();
+  }, [cleanup]);
 
   const toggle = useCallback(() => {
     if (isListening) {
@@ -137,5 +149,5 @@ export function useVoiceInput(onCommit: (transcript: string) => void): UseVoiceI
     }
   }, [isListening, start, stop]);
 
-  return { isListening, liveTranscript, start, stop, toggle, supported };
+  return { isListening, liveTranscript, error, start, stop, toggle, supported };
 }
