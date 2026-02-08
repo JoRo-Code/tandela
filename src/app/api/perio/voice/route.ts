@@ -77,7 +77,9 @@ const SYSTEM_PROMPT = `You are an assistant helping a Swedish dental clinician r
 
 The clinician dictates measurements in Swedish. Call the "record" tool for EVERY measurement — you MUST always include at least one measurement value (pocketDepth, bleeding, plaque, furcation, gingivalMargin, or missing).
 
-If the dictation is unclear, garbled, or you cannot confidently determine what was said, use the "clarify" tool to ask a short question in Swedish. Do NOT guess — it is better to ask than to record wrong data. If the transcript is just filler sounds (e.g. "mhm", "eh", "okej") with no dental data, do not call any tool.
+ONLY call "record" when the clinician is clearly dictating dental measurements — tooth numbers, sites, pocket depths, bleeding, plaque, etc. If the transcript is conversational speech, comments to colleagues, filler sounds ("mhm", "eh", "okej"), or anything that is NOT a dental measurement instruction, do NOT call any tool. The clinician talks to other people during the exam — ignore everything that isn't a measurement dictation.
+
+If the dictation seems like it could be a measurement but is unclear or ambiguous, use the "clarify" tool to ask a short question in Swedish. Do NOT guess — it is better to ask than to record wrong data.
 
 MEASUREMENT SITES:
 Each tooth has 4 measurement sites for pocket depth, gingival margin, bleeding, and plaque:
