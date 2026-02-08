@@ -54,18 +54,33 @@ export function JawTable({ jaw, examination, dispatch }: JawTableProps) {
           {/* Tooth numbers row */}
           <tr>
             <th className="sticky left-0 z-10 bg-[var(--brand-card)] p-1" />
-            {teeth.map((t, i) => (
-              <th
-                key={t}
-                colSpan={2}
-                className={`
-                  p-1 text-center font-mono text-xs font-semibold text-[var(--brand-ink)]
-                  ${i === 8 ? "border-l-2 border-[var(--brand-ink-20)]" : i > 0 ? "border-l border-[var(--brand-ink-10)]" : ""}
-                `}
-              >
-                {t}
-              </th>
-            ))}
+            {teeth.map((t, i) => {
+              const isMissing = examination.teeth[t].missing;
+              return (
+                <th
+                  key={t}
+                  colSpan={2}
+                  className={`
+                    p-1 text-center font-mono text-xs font-semibold
+                    ${i === 8 ? "border-l-2 border-[var(--brand-ink-20)]" : i > 0 ? "border-l border-[var(--brand-ink-10)]" : ""}
+                  `}
+                >
+                  <button
+                    type="button"
+                    onClick={() => dispatch({ type: "TOGGLE_MISSING", tooth: t })}
+                    className={`
+                      rounded px-1 py-0.5 transition-colors
+                      ${isMissing
+                        ? "bg-[var(--brand-ink-10)] text-[var(--brand-ink-40)] line-through"
+                        : "text-[var(--brand-ink)] hover:bg-[var(--brand-ink-10)]"}
+                    `}
+                    title={isMissing ? `Tand ${t}: markerad som saknad` : `Klicka för att markera tand ${t} som saknad`}
+                  >
+                    {t}
+                  </button>
+                </th>
+              );
+            })}
           </tr>
           {/* D | M sub-headers */}
           <tr>

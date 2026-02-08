@@ -1,74 +1,53 @@
 "use client";
 
 import { useReducer, useMemo } from "react";
-import type { PerioExamination, PerioAction } from "@/lib/perio/types";
-import { createEmptyExamination } from "@/lib/perio/create-empty-examination";
+import type { PerioExamination, PerioAction, ToothNumber } from "@/lib/perio/types";
+import { createEmptyExamination, createEmptySite } from "@/lib/perio/create-empty-examination";
 import { calculateSummary } from "@/lib/perio/calculations";
 import { JawTable } from "./jaw-table";
 import { TongueDivider } from "./tongue-divider";
 import { SummaryBar } from "./summary-bar";
 
+function updateTooth(state: PerioExamination, tooth: ToothNumber, patch: Partial<PerioExamination["teeth"][ToothNumber]>): PerioExamination {
+  return {
+    ...state,
+    teeth: {
+      ...state.teeth,
+      [tooth]: { ...state.teeth[tooth], ...patch },
+    },
+  };
+}
+
 function perioReducer(state: PerioExamination, action: PerioAction): PerioExamination {
   switch (action.type) {
     case "SET_CHECKBOX":
-      return {
-        ...state,
-        teeth: {
-          ...state.teeth,
-          [action.tooth]: {
-            ...state.teeth[action.tooth],
-            sites: {
-              ...state.teeth[action.tooth].sites,
-              [action.site]: {
-                ...state.teeth[action.tooth].sites[action.site],
-                [action.field]: action.value,
-              },
-            },
+    case "SET_NUMERIC": {
+      const tooth = state.teeth[action.tooth];
+      return updateTooth(state, action.tooth, {
+        sites: {
+          ...tooth.sites,
+          [action.site]: {
+            ...tooth.sites[action.site],
+            [action.field]: action.value,
           },
         },
-      };
+      });
+    }
 
-    case "SET_NUMERIC":
-      return {
-        ...state,
-        teeth: {
-          ...state.teeth,
-          [action.tooth]: {
-            ...state.teeth[action.tooth],
-            sites: {
-              ...state.teeth[action.tooth].sites,
-              [action.site]: {
-                ...state.teeth[action.tooth].sites[action.site],
-                [action.field]: action.value,
-              },
-            },
-          },
-        },
-      };
-
-    case "TOGGLE_MISSING":
-      return {
-        ...state,
-        teeth: {
-          ...state.teeth,
-          [action.tooth]: {
-            ...state.teeth[action.tooth],
-            missing: !state.teeth[action.tooth].missing,
-          },
-        },
-      };
+    case "TOGGLE_MISSING": {
+      const wasMissing = state.teeth[action.tooth].missing;
+      return updateTooth(state, action.tooth, {
+        missing: !wasMissing,
+        // Reset site data when marking as missing
+        ...(!wasMissing && {
+          sites: { D: createEmptySite(), M: createEmptySite() },
+          comment: "",
+        }),
+      });
+    }
 
     case "SET_COMMENT":
-      return {
-        ...state,
-        teeth: {
-          ...state.teeth,
-          [action.tooth]: {
-            ...state.teeth[action.tooth],
-            comment: action.comment,
-          },
-        },
-      };
+      return updateTooth(state, action.tooth, { comment: action.comment });
 
     case "CLEAR_ALL":
       return createEmptyExamination();
@@ -82,7 +61,16 @@ export function PerioChart() {
 
   return (
     <div className="space-y-2">
-      <SummaryBar summary={summary} />
+      <div className="flex items-center justify-between">
+        <SummaryBar summary={summary} />
+        <button
+          type="button"
+          onClick={() => dispatch({ type: "CLEAR_ALL" })}
+          className="rounded-lg border border-red-200 px-3 py-1.5 text-xs font-medium text-red-600 transition-colors hover:bg-red-50"
+        >
+          Rensa parod
+        </button>
+      </div>
 
       <div className="rounded-2xl border border-[var(--brand-ink-10)] bg-[var(--brand-card)] p-3">
         <JawTable jaw="upper" examination={examination} dispatch={dispatch} />

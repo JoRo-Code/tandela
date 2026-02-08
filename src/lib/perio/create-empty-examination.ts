@@ -1,7 +1,7 @@
 import type { PerioExamination, ToothData, ToothNumber, SiteMeasurement } from "./types";
 import { ALL_TEETH } from "./constants";
 
-function createEmptySite(): SiteMeasurement {
+export function createEmptySite(): SiteMeasurement {
   return {
     furcation: false,
     bleeding: false,
