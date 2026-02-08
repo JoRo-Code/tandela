@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 
 // Web Speech API types (not in all TS libs)
 interface SpeechRecognitionEvent extends Event {
@@ -42,9 +42,12 @@ interface UseVoiceInputReturn {
 export function useVoiceInput(onResult: (transcript: string) => void): UseVoiceInputReturn {
   const [isListening, setIsListening] = useState(false);
   const [transcript, setTranscript] = useState("");
+  const [supported, setSupported] = useState(false);
   const recognitionRef = useRef<SpeechRecognitionInstance | null>(null);
 
-  const supported = typeof window !== "undefined" && ("SpeechRecognition" in window || "webkitSpeechRecognition" in window);
+  useEffect(() => {
+    setSupported("SpeechRecognition" in window || "webkitSpeechRecognition" in window);
+  }, []);
 
   const start = useCallback(() => {
     if (!supported) return;

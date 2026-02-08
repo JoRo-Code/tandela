@@ -3,6 +3,9 @@
 import { useCallback, useState } from "react";
 import { useVoiceInput } from "@/hooks/use-voice-input";
 import type { PerioAction, ToothNumber, MeasurementSite, CheckboxField, NumericField } from "@/lib/perio/types";
+import { ALL_TEETH } from "@/lib/perio/constants";
+
+const VALID_TEETH = new Set<number>(ALL_TEETH);
 
 interface VoiceInputProps {
   dispatch: React.Dispatch<PerioAction>;
@@ -21,6 +24,7 @@ interface RecordAction {
 }
 
 function toActions(record: RecordAction): PerioAction[] {
+  if (!VALID_TEETH.has(record.tooth)) return [];
   const tooth = record.tooth as ToothNumber;
   const actions: PerioAction[] = [];
 
