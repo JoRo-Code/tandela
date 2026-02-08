@@ -28,10 +28,8 @@ function toActions(record: RecordAction): PerioAction[] {
   const tooth = record.tooth as ToothNumber;
   const actions: PerioAction[] = [];
 
-  if (record.missing !== undefined) {
-    if (record.missing) {
-      actions.push({ type: "TOGGLE_MISSING", tooth });
-    }
+  if (record.missing === true) {
+    actions.push({ type: "TOGGLE_MISSING", tooth });
     return actions;
   }
 
