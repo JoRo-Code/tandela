@@ -45,8 +45,7 @@ export function useVoiceInput(
 
   const isListening = scribe.isConnected || scribe.status === "connecting";
 
-  const committedText = scribe.committedTranscripts.map((t) => t.text).join(" ");
-  const liveTranscript = [committedText, scribe.partialTranscript].filter(Boolean).join(" ");
+  const liveTranscript = scribe.partialTranscript ?? "";
 
   const error = tokenError ?? scribe.error ?? openai.error ?? null;
 
