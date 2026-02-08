@@ -7,6 +7,7 @@ import { calculateSummary } from "@/lib/perio/calculations";
 import { JawTable } from "./jaw-table";
 import { TongueDivider } from "./tongue-divider";
 import { SummaryBar } from "./summary-bar";
+import { VoiceInput } from "./voice-input";
 
 function updateTooth(state: PerioExamination, tooth: ToothNumber, patch: Partial<PerioExamination["teeth"][ToothNumber]>): PerioExamination {
   return {
@@ -61,16 +62,18 @@ export function PerioChart() {
 
   return (
     <div className="space-y-2">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-4">
         <SummaryBar summary={summary} />
         <button
           type="button"
           onClick={() => dispatch({ type: "CLEAR_ALL" })}
           className="rounded-lg border border-red-200 px-3 py-1.5 text-xs font-medium text-red-600 transition-colors hover:bg-red-50"
         >
-          Rensa parod
+          Rensa
         </button>
       </div>
+
+      <VoiceInput dispatch={dispatch} />
 
       <div className="rounded-2xl border border-[var(--brand-ink-10)] bg-[var(--brand-card)] p-3">
         <JawTable jaw="upper" examination={examination} dispatch={dispatch} />
