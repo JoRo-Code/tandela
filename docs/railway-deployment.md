@@ -142,6 +142,11 @@ railway variables --set "AUTH_TRUST_HOST=true"
 railway variables --set "AUTH_URL=https://your-app.up.railway.app"
 ```
 
+List existing prod variables
+```bash
+railway variables -s tandela
+```
+
 ### `MissingSecret` error
 
 NextAuth requires a secret in production:
@@ -149,6 +154,7 @@ NextAuth requires a secret in production:
 ```bash
 railway variables --set "AUTH_SECRET=$(openssl rand -base64 32)"
 ```
+
 
 ### `invalid_client` (401) from Google
 
