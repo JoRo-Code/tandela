@@ -11,7 +11,7 @@ export async function POST() {
       body: JSON.stringify({
         input_audio_format: "pcm16",
         input_audio_transcription: {
-          model: "gpt-4o-mini-transcribe",
+          model: "gpt-4o-transcribe",
           language: "sv",
         },
         turn_detection: {
